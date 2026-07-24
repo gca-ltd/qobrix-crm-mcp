@@ -7,6 +7,15 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 
 ---
 
+## [1.8.2] - 2026-07-24
+
+### Fixed
+
+- **Docs:** Mode C path-mount Apache recipe (`/qobrix-mcp` + `/qobrix-oauth` +
+  RFC 8414 discovery) so Planet 9 Sign In does not fall through to a marketing
+  SPA. Notes that a stale `dist` without path-aware AS discovery fails the same
+  way.
+
 ## [1.8.1] - 2026-07-24
 
 ### Changed

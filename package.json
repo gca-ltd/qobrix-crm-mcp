@@ -1,6 +1,6 @@
 {
   "name": "qobrix-crm-mcp",
-  "version": "1.8.1",
+  "version": "1.8.2",
   "description": "Read-only Model Context Protocol (MCP) server for Qobrix CRM: tools for listings, leads, deals, RESO DD 2.0 workflows, relevance property/project search with DSL help, built-in analytics (count/top-N), and optional Redis-backed response caching for Cursor, Claude, and other MCP clients.",
   "type": "module",
   "bin": {

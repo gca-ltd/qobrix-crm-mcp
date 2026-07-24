@@ -108,6 +108,43 @@ ProxyPassReverse /qobrix-crm/mcp http://127.0.0.1:3502/mcp
 </Location>
 ```
 
+### Mode C on path mounts (e.g. humaticai.com)
+
+Planet 9 / ragchat Mode C uses separate public prefixes (`QOBRIX_MCP_PUBLIC_URL` /
+`QOBRIX_OAUTH_ISSUER`), not the Mode D `/qobrix-crm/mcp` paths above. Example:
+
+```apache
+# Browser-only MCP routes (deny /mcp + /health — agents use 127.0.0.1:3502)
+RedirectMatch ^/qobrix-mcp$ /qobrix-mcp/
+<LocationMatch "^/qobrix-mcp/(mcp|health)(/|$)">
+    Require all denied
+</LocationMatch>
+<Location /qobrix-mcp/>
+    ProxyErrorOverride Off
+</Location>
+ProxyPass        /qobrix-mcp/ http://127.0.0.1:3502/
+ProxyPassReverse /qobrix-mcp/ http://127.0.0.1:3502/
+
+# AS issuer path (strip prefix → Node sees /authorize, /token, …)
+RedirectMatch ^/qobrix-oauth$ /qobrix-oauth/
+<Location /qobrix-oauth/>
+    ProxyErrorOverride Off
+</Location>
+ProxyPass        /qobrix-oauth/ http://127.0.0.1:3503/
+ProxyPassReverse /qobrix-oauth/ http://127.0.0.1:3503/
+
+# RFC 8414 path-issuer discovery (MCP must build with path-aware oauth-rs)
+ProxyPass        /.well-known/oauth-authorization-server/qobrix-oauth http://127.0.0.1:3503/.well-known/oauth-authorization-server
+ProxyPassReverse /.well-known/oauth-authorization-server/qobrix-oauth http://127.0.0.1:3503/.well-known/oauth-authorization-server
+```
+
+Exclude `/qobrix-mcp` and `/qobrix-oauth` from any SPA `RewriteRule` catch-all.
+Rebuild and restart after pulling so `dist/` includes path-aware
+`fetchAuthorizationServerMetadata` (issuer `https://host/qobrix-oauth` →
+`/.well-known/oauth-authorization-server/qobrix-oauth`). A stale build that
+discovers at bare `/.well-known/oauth-authorization-server` will parse marketing
+SPA HTML and fail Sign In.
+
 Validate and reload:
 
 ```bash
