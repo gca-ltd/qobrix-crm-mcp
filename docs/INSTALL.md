@@ -145,6 +145,12 @@ Rebuild and restart after pulling so `dist/` includes path-aware
 discovers at bare `/.well-known/oauth-authorization-server` will parse marketing
 SPA HTML and fail Sign In.
 
+**Cookie Path trap:** never put `ProxyPassReverseCookiePath / /something` at
+vhost scope — Apache treats `/` as a prefix of every path, so Mode C’s
+`Path=/qobrix-mcp` connect cookie becomes `Path=/something` and the OAuth
+callback fails with “Connect cookie / state mismatch”. Scope that directive
+inside `<Location /eldes>` (or the app that needs it).
+
 Validate and reload:
 
 ```bash
