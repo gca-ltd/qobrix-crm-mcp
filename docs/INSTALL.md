@@ -197,6 +197,63 @@ The PRM `resource` must exactly match the MCP URL. Its first
 If a WAF restricts source networks, allow Anthropic egress
 `160.79.104.0/21`.
 
+## Connect Dust
+
+Dust and Claude share the **same** Mode D MCP URL and Authorization Server.
+On the AS, keep Claude’s redirect prefix and **append** Dust finalize prefixes to
+`QOBRIX_OAUTH_REDIRECT_ALLOWLIST` (do not replace Claude’s entry):
+
+```bash
+QOBRIX_OAUTH_REDIRECT_ALLOWLIST=https://claude.ai/api/mcp/auth_callback,https://eu.dust.tt/oauth/mcp/finalize,https://eu.dust.tt/oauth/mcp_static/finalize,http://127.0.0.1,http://localhost,cursor://
+```
+
+Dust docs: [Adding an MCP Server](https://docs.dust.tt/docs/user-documentation/admins/tools-management/adding-an-mcp-server).
+
+### Preferred — Automatic (DCR)
+
+1. In Dust: **Spaces → Tools → Add Tool → Add MCP Server**.
+2. URL: `https://intranet.sharpsir.group/qobrix-crm/mcp` (same as Claude).
+3. Auth: **Automatic**.
+4. Connection: **Personal accounts** (each member logs into Qobrix as themselves).
+5. Complete the Sharp Matrix Qobrix authorization form and approve.
+
+### Fallback — Static OAuth
+
+Use when Automatic is unavailable. Register a **new** Dust-only client (never
+reuse or overwrite Claude clients in `clients.json`):
+
+```bash
+curl -fsS -X POST \
+  https://intranet.sharpsir.group/qobrix-crm/mcp-oauth/register \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "client_name": "Dust MCP",
+    "redirect_uris": ["https://eu.dust.tt/oauth/mcp_static/finalize"],
+    "grant_types": ["authorization_code", "refresh_token"],
+    "response_types": ["code"],
+    "token_endpoint_auth_method": "client_secret_post",
+    "scope": "qobrix:read"
+  }'
+```
+
+Fill Dust’s Static OAuth form:
+
+| Field | Value |
+|-------|--------|
+| URL | `https://intranet.sharpsir.group/qobrix-crm/mcp` |
+| Token endpoint | `https://intranet.sharpsir.group/qobrix-crm/mcp-oauth/token` |
+| Authorization endpoint | `https://intranet.sharpsir.group/qobrix-crm/mcp-oauth/authorize` |
+| Scope(s) | `qobrix:read` |
+| Resource / Audience | `https://intranet.sharpsir.group/qobrix-crm/mcp` |
+| Token endpoint auth | Request body (`client_secret_post`) |
+| Client ID / Secret | From the register response above |
+
+For Global (non-EU) Dust workspaces, use the matching
+`dust.tt` / `app.dust.tt` `mcp_static` finalize URI instead of `eu.dust.tt`.
+
+If a WAF restricts source networks, allow Dust egress **in addition to**
+Anthropic `160.79.104.0/21` — do not remove Claude’s allowlist.
+
 ## Other authentication modes
 
 Modes A, B, and C remain supported. See [USER_GUIDE.md](./USER_GUIDE.md) for

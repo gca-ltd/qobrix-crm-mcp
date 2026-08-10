@@ -7,6 +7,23 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 
 ---
 
+## [1.8.3] - 2026-08-10
+
+### Added
+
+- `docs/INSTALL.md` **Connect Dust** section: Dust can share the same Mode D
+  MCP resource URL as Claude (`https://intranet.sharpsir.group/qobrix-crm/mcp`),
+  with Automatic DCR preferred and Static OAuth as a fallback. Redirect
+  allowlist examples use exact Dust finalize URLs and never drop Claude’s
+  callback.
+
+### Compatibility
+
+- Modes A–D unchanged. Claude custom connectors continue to use the same
+  resource URL and Authorization Server.
+
+---
+
 ## [1.8.2] - 2026-07-24
 
 ### Fixed
@@ -16,6 +33,7 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
   SPA. Notes that a stale `dist` without path-aware AS discovery fails the same
   way. Warns that vhost-wide `ProxyPassReverseCookiePath / /…` rewrites the
   Mode C connect cookie Path and breaks OAuth callback (“cookie / state mismatch”).
+
 
 ## [1.8.1] - 2026-07-24
 
