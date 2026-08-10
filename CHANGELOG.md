@@ -613,6 +613,6 @@ Cursor, Claude, and other Model Context Protocol clients.
   coalescing, and cache controls (`qobrix_cache_stats`, `qobrix_cache_clear`).
 - RESO Data Dictionary 2.0 aligned workflows and output-size capping.
 
-[1.2.0]: https://github.com/sharpsir-group/qobrix-crm-mcp/releases/tag/v1.2.0
-[1.1.0]: https://github.com/sharpsir-group/qobrix-crm-mcp/releases/tag/v1.1.0
-[1.0.0]: https://github.com/sharpsir-group/qobrix-crm-mcp/releases/tag/v1.0.0
+[1.2.0]: https://github.com/gca-global/qobrix-crm-mcp/releases/tag/v1.2.0
+[1.1.0]: https://github.com/gca-global/qobrix-crm-mcp/releases/tag/v1.1.0
+[1.0.0]: https://github.com/gca-global/qobrix-crm-mcp/releases/tag/v1.0.0

@@ -12,7 +12,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/sharpsir-group/qobrix-crm-mcp">GitHub</a>
+  <a href="https://github.com/gca-global/qobrix-crm-mcp">GitHub</a>
   ·
   <a href="https://qobrix.com/">Qobrix CRM</a>
   ·
@@ -34,7 +34,7 @@
   <img src="https://img.shields.io/badge/Qobrix_CRM-4A90D9?style=flat&logoColor=white" alt="Qobrix CRM integration" />
   <img src="https://img.shields.io/badge/RESO_DD_2.0-1A1A2E?style=flat&logoColor=white" alt="RESO Data Dictionary 2.0" />
   <img src="https://img.shields.io/badge/Zod-3E67B1?style=flat&logo=zod&logoColor=white" alt="Zod schema validation" />
-  <a href="https://github.com/sharpsir-group/qobrix-crm-mcp/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-Apache_2.0-blue?style=flat" alt="Apache 2.0 license" /></a>
+  <a href="https://github.com/gca-global/qobrix-crm-mcp/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-Apache_2.0-blue?style=flat" alt="Apache 2.0 license" /></a>
 </p>
 
 ---
@@ -247,7 +247,7 @@ table. The analytics/deals tools remove the need for client-side scripting:
 ### Quick Start
 
 ```bash
-git clone https://github.com/sharpsir-group/qobrix-crm-mcp.git
+git clone https://github.com/gca-global/qobrix-crm-mcp.git
 cd qobrix-crm-mcp
 npm install
 npm run build

@@ -258,7 +258,7 @@ export function buildProtectedResourceMetadata(opts: {
     scopes_supported: ["qobrix:read"],
     bearer_methods_supported: ["header"],
     resource_documentation:
-      "https://github.com/sharpsir-group/qobrix-crm-mcp#enterprise-oauth",
+      "https://github.com/gca-global/qobrix-crm-mcp#enterprise-oauth",
   };
 }
 

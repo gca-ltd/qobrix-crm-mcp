@@ -16,7 +16,7 @@ Connect [Claude.ai](https://claude.ai/), [Dust.tt](https://dust.tt/), Cursor, Ch
 **Prerequisites:** Node.js **≥ 20**, a Qobrix tenant URL, and API credentials (Modes A/B) or SharpSir’s **Enterprise OAuth** bundle (Modes C/D).
 
 ```bash
-git clone https://github.com/sharpsir-group/qobrix-crm-mcp.git
+git clone https://github.com/gca-global/qobrix-crm-mcp.git
 cd qobrix-crm-mcp
 cp .env.example .env   # fill QOBRIX_API_* for Modes A/B
 npm install
