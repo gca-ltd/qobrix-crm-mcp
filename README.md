@@ -7,14 +7,18 @@
 <h1 align="center">Qobrix CRM MCP Server</h1>
 
 <p align="center">
-  <strong>Connect Claude, Cursor, and other MCP clients to your Qobrix real-estate CRM</strong> — listings, leads, viewings, offers, contracts, and activity in one read-only <a href="https://modelcontextprotocol.io/">Model Context Protocol</a> layer.<br />
-  <strong>64 tools</strong> (CRM entities + AI relevance search + analytics + audit + cache controls + session/identity), <a href="https://www.reso.org/data-dictionary/">RESO Data Dictionary 2.0</a> workflows, optional <strong>Redis-backed response caching</strong>, <strong>four auth modes</strong> (stdio / headers / OAuth elicitation / Claude remote connector), and <strong>226+ automated tests</strong>.
+  <strong>Connect Claude.ai, Dust.tt, Cursor, and other MCP clients to your Qobrix real-estate CRM</strong> — listings, leads, viewings, offers, contracts, and activity in one read-only <a href="https://modelcontextprotocol.io/">Model Context Protocol</a> layer.<br />
+  <strong>64 tools</strong> (CRM entities + AI relevance search + analytics + audit + cache controls + session/identity), <a href="https://www.reso.org/data-dictionary/">RESO Data Dictionary 2.0</a> workflows, optional <strong>Redis-backed response caching</strong>, <strong>four auth modes</strong> (stdio / headers / OAuth elicitation / remote MCP OAuth for <strong>Claude.ai</strong> and <strong>Dust.tt</strong>), and <strong>226+ automated tests</strong>.
 </p>
 
 <p align="center">
   <a href="https://github.com/sharpsir-group/qobrix-crm-mcp">GitHub</a>
   ·
   <a href="https://qobrix.com/">Qobrix CRM</a>
+  ·
+  <a href="https://claude.ai/">Claude.ai</a>
+  ·
+  <a href="https://dust.tt/">Dust.tt</a>
   ·
   <a href="https://modelcontextprotocol.io/">MCP specification</a>
   ·
@@ -25,6 +29,8 @@
   <img src="https://img.shields.io/badge/TypeScript-3178C6?style=flat&logo=typescript&logoColor=white" alt="Built with TypeScript" />
   <img src="https://img.shields.io/badge/Node.js-339933?style=flat&logo=nodedotjs&logoColor=white" alt="Requires Node.js 20+" />
   <img src="https://img.shields.io/badge/MCP-000000?style=flat&logo=anthropic&logoColor=white" alt="Model Context Protocol" />
+  <img src="https://img.shields.io/badge/Claude.ai-D97706?style=flat&logo=anthropic&logoColor=white" alt="Claude.ai custom connector supported" />
+  <img src="https://img.shields.io/badge/Dust.tt-0F172A?style=flat&logoColor=white" alt="Dust.tt remote MCP supported" />
   <img src="https://img.shields.io/badge/Qobrix_CRM-4A90D9?style=flat&logoColor=white" alt="Qobrix CRM integration" />
   <img src="https://img.shields.io/badge/RESO_DD_2.0-1A1A2E?style=flat&logoColor=white" alt="RESO Data Dictionary 2.0" />
   <img src="https://img.shields.io/badge/Zod-3E67B1?style=flat&logo=zod&logoColor=white" alt="Zod schema validation" />
@@ -35,8 +41,8 @@
 
 ## Table of contents
 
-- [**Installation Guide**](docs/INSTALL.md) — Sharp Matrix intranet, pm2, Apache, and Claude connector setup
-- [**User Guide**](docs/USER_GUIDE.md) — Mode A → Mode B → Mode C → Mode D (Claude.ai) step-by-step
+- [**Installation Guide**](docs/INSTALL.md) — Sharp Matrix intranet, pm2, Apache, Claude.ai + Dust.tt connectors
+- [**User Guide**](docs/USER_GUIDE.md) — Mode A → Mode B → Mode C → Mode D (Claude.ai + Dust.tt) step-by-step
 - [What it does](#what-it-does)
 - [Who it is for](#who-it-is-for)
 - [Canonical real-estate workflows](#canonical-re-workflows)
@@ -64,7 +70,7 @@ An AI assistant connected to this server can browse properties, qualify leads, t
 
 ### Who it is for
 
-- **Brokerages & developers** using [Qobrix](https://qobrix.com/) who want ChatGPT, Claude, or Cursor to answer questions grounded in live CRM data (not copy-pasted exports).
+- **Brokerages & developers** using [Qobrix](https://qobrix.com/) who want [Claude.ai](https://claude.ai/), [Dust.tt](https://dust.tt/), ChatGPT, or Cursor to answer questions grounded in live CRM data (not copy-pasted exports).
 - **Engineers** wiring **MCP** into internal tools: stdio transport, typed Zod inputs, and no write surface — safe to experiment with prompts and agents.
 - **Data & operations teams** running dashboards: use **`qobrix_count`** / **`qobrix_top_values`** for YoY-style metrics without custom scripts, and **response caching** to cut API load on repeat queries.
 - **Enterprise IT** ready for per-agent identity: run Modes A/B from this package, then pair Mode C with SharpSir’s **Enterprise OAuth** (SSO) product when every user must authenticate as themselves — see [Enterprise OAuth](#enterprise-oauth).
@@ -274,9 +280,9 @@ Clone this package, run Mode A or B, and put live Qobrix data in front of Claude
 | **A** (default) | Yes | `QOBRIX_MCP_TRANSPORT=stdio` (or unset) | Shared `QOBRIX_API_*` from process env |
 | **B** | Yes | `TRANSPORT=http` + `QOBRIX_MCP_AUTH=headers` | Per-request `X-Api-User` / `X-Api-Key` (trusted callers; bind localhost) |
 | **C** | Needs companion AS | `TRANSPORT=http` + `QOBRIX_MCP_AUTH=oauth` | Self-service OAuth: MCP returns a `/connect` URL; user signs in at SharpSir’s **Enterprise OAuth** Authorization Server; this server holds the session |
-| **D** (opt-in) | Needs companion AS | `TRANSPORT=http` + `QOBRIX_MCP_AUTH=oauth-claude` | Claude.ai / Desktop **remote custom connector**: RFC 9728 PRM + Bearer on `/mcp` (client-driven OAuth) |
+| **D** (opt-in) | Needs companion AS | `TRANSPORT=http` + `QOBRIX_MCP_AUTH=oauth-claude` | Remote MCP OAuth (RFC 9728 PRM + Bearer on `/mcp`) for **Claude.ai** / Desktop custom connectors **and Dust.tt** Spaces tools — same resource URL, per-user login |
 
-Modes A and B are fully supported out of this package. Modes C and D require SharpSir’s separate Enterprise OAuth / SSO product — not distributed as part of this repo. **Mode D does not change Modes A/B/C** — select it only when you want Claude.ai Connectors OAuth.
+Modes A and B are fully supported out of this package. Modes C and D require SharpSir’s separate Enterprise OAuth / SSO product — not distributed as part of this repo. **Mode D does not change Modes A/B/C** — select it when you want remote hosts such as Claude.ai or Dust.tt to drive OAuth themselves.
 
 ### Enterprise OAuth
 
@@ -340,15 +346,22 @@ See **[docs/USER_GUIDE.md](docs/USER_GUIDE.md)** for Mode A → B → C step-by-
 
 For **ragchat / Mode C**, register the remote MCP URL (`…/mcp`) as a normal Streamable HTTP server (**no client-side OAuth provider required**); the MCP handles auth via `/connect`. Keep `/mcp` on localhost in that topology.
 
-#### Mode D — Claude.ai / Desktop custom connector
+#### Mode D — Claude.ai and Dust.tt remote MCP (shared resource)
 
-Use a **separate** MCP process (or host) with `QOBRIX_MCP_AUTH=oauth-claude`. Claude drives OAuth itself:
+Use a **separate** MCP process (or host) with `QOBRIX_MCP_AUTH=oauth-claude`. Remote hosts drive OAuth themselves against the same HTTPS `/mcp` URL:
 
-1. User adds a custom connector in Claude.ai / Desktop → pastes `https://intranet.sharpsir.group/qobrix-crm/mcp`
-2. Claude hits `/mcp` → receives `401` + `WWW-Authenticate: Bearer resource_metadata=…`
-3. Claude fetches `/.well-known/oauth-protected-resource` → discovers `QOBRIX_OAUTH_ISSUER`
-4. Claude completes DCR + PKCE against the Enterprise OAuth AS (redirect `https://claude.ai/api/mcp/auth_callback`)
+| Host | How to connect | Auth |
+|------|----------------|------|
+| **[Claude.ai](https://claude.ai/) / Claude Desktop** | Settings → Connectors → Add custom connector | Automatic DCR + PKCE (redirect `https://claude.ai/api/mcp/auth_callback`) |
+| **[Dust.tt](https://dust.tt/)** | Spaces → Tools → Add MCP Server | Prefer **Automatic**; Static OAuth fallback — see [INSTALL — Connect Dust](docs/INSTALL.md#connect-dust) |
+
+1. User pastes `https://intranet.sharpsir.group/qobrix-crm/mcp` into Claude or Dust
+2. Host hits `/mcp` → receives `401` + `WWW-Authenticate: Bearer resource_metadata=…`
+3. Host fetches `/.well-known/oauth-protected-resource` → discovers `QOBRIX_OAUTH_ISSUER`
+4. Host completes OAuth (DCR or Static) + PKCE against the Enterprise OAuth AS
 5. Subsequent `/mcp` calls send `Authorization: Bearer <access_token>`; this server introspects and runs tools as that Qobrix user
+
+Claude and Dust **share one Mode D stack** (same MCP resource + same Authorization Server). Each host registers its own OAuth client; each member logs into Qobrix as themselves.
 
 ```bash
 export QOBRIX_MCP_TRANSPORT=http
@@ -363,13 +376,15 @@ export QOBRIX_OAUTH_INTROSPECTION_SECRET=<shared-secret-from-bundle>
 npm start
 ```
 
-On the AS, when using a redirect allowlist, include Claude’s hosted callback:
+On the AS, when using a redirect allowlist, keep Claude’s callback and append exact Dust finalize URLs (never replace Claude’s entry):
 
 ```bash
-export QOBRIX_OAUTH_REDIRECT_ALLOWLIST=https://claude.ai/api/mcp/auth_callback,http://127.0.0.1,http://localhost,cursor://
+export QOBRIX_OAUTH_REDIRECT_ALLOWLIST=https://claude.ai/api/mcp/auth_callback,http://127.0.0.1,http://localhost,cursor://,https://eu.dust.tt/oauth/mcp/finalize,https://eu.dust.tt/oauth/mcp_static/finalize,https://dust.tt/oauth/mcp/finalize,https://dust.tt/oauth/mcp_static/finalize,https://app.dust.tt/oauth/mcp/finalize,https://app.dust.tt/oauth/mcp_static/finalize
 ```
 
-Publish **HTTPS `/mcp` + PRM** (and the AS) to the public internet; allowlist Anthropic egress `160.79.104.0/21` if WAF’d. Mode C’s loopback/`deny public /mcp` guidance stays valid for ragchat deployments — do not flip that topology for Mode C processes.
+Publish **HTTPS `/mcp` + PRM** (and the AS) to the public internet; allowlist Anthropic egress `160.79.104.0/21` if WAF’d, and allow Dust egress in addition — do not remove Claude’s allowlist. Mode C’s loopback/`deny public /mcp` guidance stays valid for ragchat deployments — do not flip that topology for Mode C processes.
+
+Full steps: [INSTALL — Connect Claude](docs/INSTALL.md#connect-claude) · [INSTALL — Connect Dust](docs/INSTALL.md#connect-dust) · [Dust: Adding an MCP Server](https://docs.dust.tt/docs/user-documentation/admins/tools-management/adding-an-mcp-server).
 
 ### Caching
 
@@ -509,7 +524,11 @@ Cursor supports an `envFile` property for stdio servers. Some setups do not pass
 
 ### Other MCP hosts
 
-**Claude Desktop** — same stdio shape: `command` + `args` to `node` and either `--env-file` or `env` in the host’s MCP config file.
+**Claude.ai / Claude Desktop (Mode D)** — remote custom connector at `https://intranet.sharpsir.group/qobrix-crm/mcp`. See [Mode D](#mode-d--claudeai-and-dusttt-remote-mcp-shared-resource) and [INSTALL — Connect Claude](docs/INSTALL.md#connect-claude).
+
+**Dust.tt (Mode D)** — Spaces → Tools → Add MCP Server with the **same** URL. Prefer Automatic auth and Personal accounts. See [INSTALL — Connect Dust](docs/INSTALL.md#connect-dust).
+
+**Claude Desktop / Cursor (Mode A stdio)** — same stdio shape: `command` + `args` to `node` and either `--env-file` or `env` in the host’s MCP config file.
 
 **CI / headless** — run `node --env-file=.env dist/index.js` with a stdio MCP client library; ensure `.env` is supplied via secrets, not committed.
 

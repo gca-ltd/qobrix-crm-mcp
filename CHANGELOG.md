@@ -11,16 +11,19 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 
 ### Added
 
-- `docs/INSTALL.md` **Connect Dust** section: Dust can share the same Mode D
-  MCP resource URL as Claude (`https://intranet.sharpsir.group/qobrix-crm/mcp`),
-  with Automatic DCR preferred and Static OAuth as a fallback. Redirect
-  allowlist examples use exact Dust finalize URLs and never drop Claude’s
-  callback.
+- **Claude.ai + Dust.tt on one Mode D stack.** Documented connecting
+  [Claude.ai](https://claude.ai/) custom connectors and [Dust.tt](https://dust.tt/)
+  Spaces MCP tools to the same public resource
+  (`https://intranet.sharpsir.group/qobrix-crm/mcp`) and Authorization Server.
+  Prefer Dust Automatic DCR; Static OAuth is documented as a fallback.
+- `docs/INSTALL.md` **Connect Dust** section; README / USER_GUIDE Mode D updated
+  for both hosts. Redirect allowlist examples use exact Dust finalize URLs and
+  never drop Claude’s callback.
 
 ### Compatibility
 
-- Modes A–D unchanged. Claude custom connectors continue to use the same
-  resource URL and Authorization Server.
+- Modes A–D unchanged. Existing Claude.ai connectors keep working on the same
+  URL while Dust is added as a second Mode D client.
 
 ---
 
