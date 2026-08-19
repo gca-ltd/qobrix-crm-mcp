@@ -50,11 +50,11 @@
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "https://github.com/gca-global/qobrix-crm-mcp.git"
+    "url": "https://github.com/gca-ltd/qobrix-crm-mcp.git"
   },
-  "homepage": "https://github.com/gca-global/qobrix-crm-mcp#readme",
+  "homepage": "https://github.com/gca-ltd/qobrix-crm-mcp#readme",
   "bugs": {
-    "url": "https://github.com/gca-global/qobrix-crm-mcp/issues"
+    "url": "https://github.com/gca-ltd/qobrix-crm-mcp/issues"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.26.0",
