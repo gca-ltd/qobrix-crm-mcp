@@ -11,9 +11,9 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 
 ### Added
 
-- **Dual HTTP mode** (`QOBRIX_MCP_DUAL_MODE=1`): one process serves Mode D on
-  `/mcp` (Bearer + PRM) and Mode C on `/mcp-c` (per-user vault + `/connect`).
-  Request-scoped auth via ALS (`getRequestAuthMode()`).
+- **Auto HTTP mode** (`QOBRIX_MCP_AUTO_MODE=1`, alias `QOBRIX_MCP_DUAL_MODE`): one
+  `/mcp` endpoint — Bearer → Mode D; `X-Chat-User-Id` → Mode C; else Mode D 401.
+  Request-scoped auth via ALS (`getRequestAuthMode()`). `/mcp-c` removed.
 
 ### Changed
 

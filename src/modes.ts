@@ -30,28 +30,59 @@ export type AuthMode = "env" | "headers" | "oauth" | "oauth-claude";
 
 export type TransportMode = "stdio" | "http";
 
-/** Mode D northbound MCP path (Claude / Dust / Cursor). */
-export const MCP_PATH_MODE_D = "/mcp";
+/** Northbound MCP path (all HTTP clients). */
+export const MCP_PATH = "/mcp";
 
-/** Mode C northbound MCP path (Matrix Digital Employees / ragchat). */
-export const MCP_PATH_MODE_C = "/mcp-c";
+/** @deprecated alias — same path as {@link MCP_PATH}. */
+export const MCP_PATH_MODE_D = MCP_PATH;
+
+export type RequestHeaderBag = Record<string, string | string[] | undefined>;
+
+function headerOne(headers: RequestHeaderBag, name: string): string {
+  const key = name.toLowerCase();
+  const v = headers[key] ?? headers[name];
+  if (Array.isArray(v)) return String(v[0] || "").trim();
+  return String(v || "").trim();
+}
 
 /**
- * When true, one process serves both /mcp (Mode D) and /mcp-c (Mode C) with
- * per-path auth. Claude/Dust/Cursor keep /mcp; trusted loopback clients use
- * /mcp-c without Bearer.
+ * When true, one `/mcp` endpoint auto-selects auth per request:
+ * Bearer → Mode D; `X-Chat-User-Id` → Mode C; otherwise Mode D (401 for Claude).
+ * Env `QOBRIX_MCP_AUTO_MODE` or legacy `QOBRIX_MCP_DUAL_MODE`.
  */
-export function isDualHttpMode(): boolean {
-  const raw = (process.env.QOBRIX_MCP_DUAL_MODE || "").toLowerCase().trim();
+export function isAutoHttpMode(): boolean {
+  const raw = (
+    process.env.QOBRIX_MCP_AUTO_MODE ||
+    process.env.QOBRIX_MCP_DUAL_MODE ||
+    ""
+  )
+    .toLowerCase()
+    .trim();
   return raw === "1" || raw === "true" || raw === "yes";
 }
 
-/** Auth mode for a registered MCP HTTP path, or null if unknown. */
-export function authModeForMcpPath(path: string): AuthMode | null {
-  const normalized = path.replace(/\/+$/, "") || "/";
-  if (normalized === MCP_PATH_MODE_D) return "oauth-claude";
-  if (normalized === MCP_PATH_MODE_C) return "oauth";
-  return null;
+/** @deprecated use {@link isAutoHttpMode} */
+export function isDualHttpMode(): boolean {
+  return isAutoHttpMode();
+}
+
+/**
+ * Per-request auth when auto mode is on. Single `/mcp` URL for all clients.
+ */
+export function resolveAuthModeFromRequest(
+  headers: RequestHeaderBag,
+  autoMode: boolean,
+  defaultMode: AuthMode,
+): AuthMode {
+  if (!autoMode) return defaultMode;
+
+  const auth = headerOne(headers, "authorization");
+  if (auth.toLowerCase().startsWith("bearer ")) return "oauth-claude";
+
+  const userId = headerOne(headers, "x-chat-user-id");
+  if (userId) return "oauth";
+
+  return "oauth-claude";
 }
 
 export function resolveTransport(): TransportMode {

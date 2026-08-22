@@ -869,4 +869,125 @@ describe("modes + open-core pairing", () => {
       }
     }
   });
+
+  it("Auto mode: single /mcp — no headers → 401; X-Chat-User-Id → 200", async () => {
+    const dataDir = join(
+      tmpdir(),
+      "qobrix-oauth-auto-" + randomBytes(4).toString("hex")
+    );
+    const mcpDataDir = join(
+      tmpdir(),
+      "qobrix-mcp-auto-" + randomBytes(4).toString("hex")
+    );
+    mkdirSync(dataDir, { recursive: true });
+    mkdirSync(mcpDataDir, { recursive: true });
+    const portAs = 13509;
+    const portMcp = 13510;
+    const resource = `http://127.0.0.1:${portMcp}/mcp`;
+    const publicUrl = `http://127.0.0.1:${portMcp}`;
+    const issuer = `http://127.0.0.1:${portAs}`;
+
+    const as = spawnNode(OAUTH_ROOT, ["dist/index.js"], {
+      QOBRIX_OAUTH_ISSUER: issuer,
+      QOBRIX_MCP_RESOURCE_URL: resource,
+      QOBRIX_OAUTH_INTROSPECTION_SECRET: SECRET,
+      QOBRIX_OAUTH_VAULT_KEY: VAULT_KEY,
+      QOBRIX_OAUTH_HOST: "127.0.0.1",
+      QOBRIX_OAUTH_PORT: String(portAs),
+      QOBRIX_OAUTH_DATA_DIR: dataDir,
+      QOBRIX_API_URL: "https://example.invalid",
+      MCP_DANGEROUSLY_ALLOW_INSECURE_ISSUER_URL: "true",
+    });
+
+    const mcp = spawnNode(MCP_ROOT, ["dist/index.js"], {
+      QOBRIX_MCP_TRANSPORT: "http",
+      QOBRIX_MCP_AUTH: "oauth-claude",
+      QOBRIX_MCP_DUAL_MODE: "1",
+      QOBRIX_MCP_HOST: "127.0.0.1",
+      QOBRIX_MCP_PORT: String(portMcp),
+      QOBRIX_OAUTH_ISSUER: issuer,
+      QOBRIX_MCP_RESOURCE_URL: resource,
+      QOBRIX_MCP_PUBLIC_URL: publicUrl,
+      QOBRIX_OAUTH_INTROSPECTION_SECRET: SECRET,
+      QOBRIX_MCP_STATE_SECRET: STATE_SECRET,
+      QOBRIX_MCP_DATA_DIR: mcpDataDir,
+      QOBRIX_API_URL: "https://example.invalid",
+      MCP_DANGEROUSLY_ALLOW_INSECURE_ISSUER_URL: "true",
+    });
+
+    try {
+      await waitUrl(`${issuer}/health`);
+      await waitUrl(`http://127.0.0.1:${portMcp}/health`);
+
+      const health = await fetch(`http://127.0.0.1:${portMcp}/health`);
+      assert.equal(health.status, 200);
+      const healthBody = await health.json();
+      assert.equal(healthBody.auth, "auto");
+      assert.equal(healthBody.auto_mode, true);
+
+      const noHdr = await fetch(resource, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: 1,
+          method: "initialize",
+          params: {
+            protocolVersion: "2025-03-26",
+            capabilities: {},
+            clientInfo: { name: "claude-probe", version: "0" },
+          },
+        }),
+      });
+      assert.equal(noHdr.status, 401);
+      assert.match(noHdr.headers.get("www-authenticate") || "", /Bearer/i);
+
+      const chatInit = await fetch(resource, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json, text/event-stream",
+          "X-Chat-Platform": "matrix",
+          "X-Chat-User-Id": "user-auto-mode-test",
+        },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: 1,
+          method: "initialize",
+          params: {
+            protocolVersion: "2025-03-26",
+            capabilities: {},
+            clientInfo: { name: "digital-employees", version: "0" },
+          },
+        }),
+      });
+      assert.ok(
+        chatInit.status === 200 || chatInit.status === 202,
+        `X-Chat headers should route to Mode C, got ${chatInit.status}`
+      );
+
+      const gone = await fetch(`http://127.0.0.1:${portMcp}/mcp-c`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: "{}",
+      });
+      assert.equal(gone.status, 404);
+    } finally {
+      as.kill("SIGTERM");
+      mcp.kill("SIGTERM");
+      try {
+        rmSync(dataDir, { recursive: true, force: true });
+      } catch {
+        /* ignore */
+      }
+      try {
+        rmSync(mcpDataDir, { recursive: true, force: true });
+      } catch {
+        /* ignore */
+      }
+    }
+  });
 });
