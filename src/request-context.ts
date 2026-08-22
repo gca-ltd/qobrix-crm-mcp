@@ -6,12 +6,15 @@
 
 import { AsyncLocalStorage } from "node:async_hooks";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { AuthMode } from "./modes.js";
 import { DEFAULT_VAULT_KEY } from "./identity.js";
 
 export type RequestContext = {
   mcpServer?: McpServer;
   /** Mode C per-user vault key (`{platform}:{userId}` or `default`). */
   vaultKey?: string;
+  /** HTTP auth mode for this MCP request (dual-mode per-path routing). */
+  authMode?: AuthMode;
 };
 
 const requestStorage = new AsyncLocalStorage<RequestContext>();
@@ -33,6 +36,11 @@ export function getRequestMcpServer(): McpServer | undefined {
 
 export function getRequestVaultKey(): string {
   return requestStorage.getStore()?.vaultKey || DEFAULT_VAULT_KEY;
+}
+
+/** Per-request auth mode when dual HTTP mode is active; undefined on stdio. */
+export function getRequestAuthMode(): AuthMode | undefined {
+  return requestStorage.getStore()?.authMode;
 }
 
 /** True when the connected client declared elicitation.url capability. */

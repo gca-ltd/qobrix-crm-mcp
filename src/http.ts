@@ -22,7 +22,8 @@ import type { OAuthTokenVerifier } from "@modelcontextprotocol/sdk/server/auth/p
 import { createServer } from "./server.js";
 import { disableEnvFallback } from "./client.js";
 import { runWithAuthAsync, type AuthCredentials } from "./auth-context.js";
-import { resolveAuthMode, modeDescription } from "./modes.js";
+import { resolveAuthMode, modeDescription, isDualHttpMode, MCP_PATH_MODE_C, MCP_PATH_MODE_D } from "./modes.js";
+import type { AuthMode } from "./modes.js";
 import {
   buildProtectedResourceMetadata,
   createCompanionTokenVerifier,
@@ -48,7 +49,15 @@ import {
 } from "./identity.js";
 import { errorHtml, successHtml } from "./auth-pages.js";
 
-const MCP_PATH = "/mcp";
+const MCP_PATH = MCP_PATH_MODE_D;
+
+function modeCEnabled(dualMode: boolean, authMode: AuthMode): boolean {
+  return dualMode || authMode === "oauth";
+}
+
+function modeDEnabled(dualMode: boolean, authMode: AuthMode): boolean {
+  return dualMode || authMode === "oauth-claude";
+}
 
 function readHeaderCreds(req: Request): AuthCredentials | null {
   const apiUser = String(req.headers["x-api-user"] || "").trim();
@@ -85,6 +94,7 @@ export async function startHttpServer(): Promise<void> {
   const port = Number(process.env.QOBRIX_MCP_PORT || 3502);
   const host = process.env.QOBRIX_MCP_HOST || "127.0.0.1";
   const authMode = resolveAuthMode("http");
+  const dualMode = isDualHttpMode();
 
   const app = createMcpExpressApp({
     host,
@@ -104,15 +114,27 @@ export async function startHttpServer(): Promise<void> {
   );
 
   app.get("/health", (_req, res) => {
-    const vaultCount =
-      authMode === "oauth" ? countSessionVaults() : undefined;
+    const vaultCount = modeCEnabled(dualMode, authMode)
+      ? countSessionVaults()
+      : undefined;
     res.json({
       ok: true,
       transport: "http",
-      auth: authMode,
-      description: modeDescription(authMode),
+      auth: dualMode ? "dual" : authMode,
+      dual_mode: dualMode,
+      endpoints: dualMode
+        ? {
+            [MCP_PATH_MODE_D]: "oauth-claude",
+            [MCP_PATH_MODE_C]: "oauth",
+          }
+        : { [MCP_PATH]: authMode },
+      description: dualMode
+        ? "Dual mode: /mcp (Mode D) + /mcp-c (Mode C)"
+        : modeDescription(authMode),
       connected:
-        authMode === "oauth" ? Boolean(vaultCount && vaultCount > 0) : undefined,
+        modeCEnabled(dualMode, authMode)
+          ? Boolean(vaultCount && vaultCount > 0)
+          : undefined,
       session_vaults: vaultCount,
     });
   });
@@ -120,6 +142,7 @@ export async function startHttpServer(): Promise<void> {
   // Modes B/C/D are strictly per-request (or session vault): never fall back to
   // a shared env account inside tool handlers.
   if (
+    dualMode ||
     authMode === "oauth" ||
     authMode === "headers" ||
     authMode === "oauth-claude"
@@ -137,7 +160,7 @@ export async function startHttpServer(): Promise<void> {
     );
   }
 
-  if (authMode === "oauth") {
+  if (modeCEnabled(dualMode, authMode)) {
     // Validate env early; DCR can wait until first /connect.
     requireOAuthEnv();
     if (!isLoopbackHost(host) && !process.env.QOBRIX_MCP_ALLOWED_HOSTS) {
@@ -221,7 +244,7 @@ export async function startHttpServer(): Promise<void> {
   }
 
   // Mode D — Claude.ai / Desktop remote connector (opt-in; does not alter Mode C).
-  if (authMode === "oauth-claude") {
+  if (modeDEnabled(dualMode, authMode)) {
     const { issuer, resourceServerUrl, introspectionSecret } = requireOAuthEnv();
     modeDResourceUrl = resourceServerUrl;
     const prm = buildProtectedResourceMetadata({
@@ -280,7 +303,11 @@ export async function startHttpServer(): Promise<void> {
   /** Keep McpServer refs for request-context (elicitation capabilities). */
   const servers = new WeakMap<StreamableHTTPServerTransport, McpServer>();
 
-  const handleMcp = async (req: Request, res: Response): Promise<void> => {
+  const handleMcp = async (
+    req: Request,
+    res: Response,
+    routeAuthMode: AuthMode,
+  ): Promise<void> => {
     const run = async (vaultKey = "default") => {
       const sessionId = req.headers["mcp-session-id"] as string | undefined;
       let transport: StreamableHTTPServerTransport | undefined;
@@ -327,7 +354,7 @@ export async function startHttpServer(): Promise<void> {
       // would corrupt the SSE stream / delete handling.
       const parsedBody = req.method === "POST" ? req.body : undefined;
       await runWithRequestContext(
-        { mcpServer: activeServer, vaultKey },
+        { mcpServer: activeServer, vaultKey, authMode: routeAuthMode },
         async () => {
           await transport!.handleRequest(req, res, parsedBody);
         }
@@ -335,7 +362,7 @@ export async function startHttpServer(): Promise<void> {
     };
 
     // Mode D — Claude remote connector: require Bearer; never fall into Mode C.
-    if (authMode === "oauth-claude") {
+    if (routeAuthMode === "oauth-claude") {
       const resourceUrl = modeDResourceUrl;
       const verifier = modeDVerifier;
       if (!resourceUrl || !verifier) {
@@ -403,7 +430,7 @@ export async function startHttpServer(): Promise<void> {
       return;
     }
 
-    if (authMode === "oauth") {
+    if (routeAuthMode === "oauth") {
       const { vaultKey, reason } = resolveVaultKeyFromHeaders({
         platform: String(req.headers["x-chat-platform"] || ""),
         userId: String(req.headers["x-chat-user-id"] || ""),
@@ -436,7 +463,7 @@ export async function startHttpServer(): Promise<void> {
       return;
     }
 
-    if (authMode === "headers") {
+    if (routeAuthMode === "headers") {
       const creds = readHeaderCreds(req);
       if (!creds) {
         res.status(401).json({
@@ -454,25 +481,35 @@ export async function startHttpServer(): Promise<void> {
     await run();
   };
 
-  const mcpRoutes = [MCP_PATH];
-  for (const path of mcpRoutes) {
+  const mcpRoutes: Array<{ path: string; mode: AuthMode }> = dualMode
+    ? [
+        { path: MCP_PATH_MODE_D, mode: "oauth-claude" },
+        { path: MCP_PATH_MODE_C, mode: "oauth" },
+      ]
+    : [{ path: MCP_PATH, mode: authMode }];
+
+  for (const { path, mode } of mcpRoutes) {
     app.post(path, (req, res) => {
-      void handleMcp(req, res);
+      void handleMcp(req, res, mode);
     });
     app.get(path, (req, res) => {
-      void handleMcp(req, res);
+      void handleMcp(req, res, mode);
     });
     app.delete(path, (req, res) => {
-      void handleMcp(req, res);
+      void handleMcp(req, res, mode);
     });
   }
 
   await new Promise<void>((resolve, reject) => {
     const server = app.listen(port, host, () => {
       process.stderr.write(
-        `[qobrix-crm-mcp] HTTP listening on http://${host}:${port}${MCP_PATH} (${modeDescription(authMode)})\n`
+        `[qobrix-crm-mcp] HTTP listening on http://${host}:${port}` +
+          (dualMode
+            ? ` ${MCP_PATH_MODE_D} (Mode D) + ${MCP_PATH_MODE_C} (Mode C)`
+            : `${MCP_PATH} (${modeDescription(authMode)})`) +
+          "\n"
       );
-      if (authMode === "oauth") {
+      if (modeCEnabled(dualMode, authMode)) {
         try {
           const { resourceServerUrl } = requireOAuthEnv();
           process.stderr.write(
@@ -485,7 +522,7 @@ export async function startHttpServer(): Promise<void> {
           /* already validated above */
         }
       }
-      if (authMode === "oauth-claude") {
+      if (modeDEnabled(dualMode, authMode)) {
         try {
           const { resourceServerUrl, issuer } = requireOAuthEnv();
           process.stderr.write(

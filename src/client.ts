@@ -13,6 +13,12 @@ import {
   type AuthCredentials,
 } from "./auth-context.js";
 import { resolveAuthMode } from "./modes.js";
+import type { AuthMode } from "./modes.js";
+import { getRequestAuthMode } from "./request-context.js";
+
+function effectiveAuthMode(): AuthMode {
+  return getRequestAuthMode() ?? resolveAuthMode();
+}
 import {
   AuthRequiredError,
   beginConnect,
@@ -192,7 +198,7 @@ export class QobrixClient {
       // Mode C: expired / revoked Qobrix keys → clear vault and re-prompt connect.
       if (
         (response.status === 401 || response.status === 403) &&
-        resolveAuthMode() === "oauth"
+        effectiveAuthMode() === "oauth"
       ) {
         clearSession(); // scoped to current request vaultKey via ALS
         const { elicitationId, connectUrl } = beginConnect();
@@ -331,7 +337,7 @@ export function getClient(): QobrixClient {
     return touchLru(tmp.fingerprint, tmp);
   }
   if (!_envFallbackEnabled) {
-    if (resolveAuthMode() === "oauth") {
+    if (effectiveAuthMode() === "oauth") {
       const { elicitationId, connectUrl } = beginConnect();
       throw new AuthRequiredError({ elicitationId, connectUrl });
     }

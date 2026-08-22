@@ -13,6 +13,12 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { getAuthContext } from "../auth-context.js";
 import { getClient } from "../client.js";
 import { resolveAuthMode, modeDescription } from "../modes.js";
+import { getRequestAuthMode } from "../request-context.js";
+import type { AuthMode } from "../modes.js";
+
+function effectiveAuthMode(): AuthMode {
+  return getRequestAuthMode() ?? resolveAuthMode();
+}
 import {
   AuthRequiredError,
   beginConnect,
@@ -56,7 +62,7 @@ export function registerSessionTools(server: McpServer): void {
     SignInSchema.shape,
     async () => {
       try {
-        const mode = resolveAuthMode();
+        const mode = effectiveAuthMode();
         if (mode !== "oauth") {
           return textResult(
             `This MCP instance authenticates via ${modeDescription(mode)}; ` +
@@ -92,7 +98,7 @@ export function registerSessionTools(server: McpServer): void {
     SignOutSchema.shape,
     async () => {
       try {
-        const mode = resolveAuthMode();
+        const mode = effectiveAuthMode();
         if (mode !== "oauth") {
           return textResult(
             `No interactive session to clear in ${modeDescription(mode)}.`
@@ -125,7 +131,7 @@ export function registerSessionTools(server: McpServer): void {
     WhoAmISchema.shape,
     async () => {
       try {
-        const mode = resolveAuthMode();
+        const mode = effectiveAuthMode();
         const creds = getSessionCredentials();
         const ctx = getAuthContext();
 

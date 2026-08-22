@@ -30,6 +30,30 @@ export type AuthMode = "env" | "headers" | "oauth" | "oauth-claude";
 
 export type TransportMode = "stdio" | "http";
 
+/** Mode D northbound MCP path (Claude / Dust / Cursor). */
+export const MCP_PATH_MODE_D = "/mcp";
+
+/** Mode C northbound MCP path (Matrix Digital Employees / ragchat). */
+export const MCP_PATH_MODE_C = "/mcp-c";
+
+/**
+ * When true, one process serves both /mcp (Mode D) and /mcp-c (Mode C) with
+ * per-path auth. Claude/Dust/Cursor keep /mcp; trusted loopback clients use
+ * /mcp-c without Bearer.
+ */
+export function isDualHttpMode(): boolean {
+  const raw = (process.env.QOBRIX_MCP_DUAL_MODE || "").toLowerCase().trim();
+  return raw === "1" || raw === "true" || raw === "yes";
+}
+
+/** Auth mode for a registered MCP HTTP path, or null if unknown. */
+export function authModeForMcpPath(path: string): AuthMode | null {
+  const normalized = path.replace(/\/+$/, "") || "/";
+  if (normalized === MCP_PATH_MODE_D) return "oauth-claude";
+  if (normalized === MCP_PATH_MODE_C) return "oauth";
+  return null;
+}
+
 export function resolveTransport(): TransportMode {
   const raw = (process.env.QOBRIX_MCP_TRANSPORT || "stdio").toLowerCase().trim();
   if (raw === "http" || raw === "streamable_http" || raw === "streamable-http") {

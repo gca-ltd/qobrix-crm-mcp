@@ -7,6 +7,21 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 
 ---
 
+## [Unreleased]
+
+### Added
+
+- **Dual HTTP mode** (`QOBRIX_MCP_DUAL_MODE=1`): one process serves Mode D on
+  `/mcp` (Bearer + PRM) and Mode C on `/mcp-c` (per-user vault + `/connect`).
+  Request-scoped auth via ALS (`getRequestAuthMode()`).
+
+### Changed
+
+- Mode C routes (`/connect`, `/oauth/callback`) and Mode D PRM register when dual
+  mode is enabled, even if `QOBRIX_MCP_AUTH=oauth-claude`.
+
+---
+
 ## [1.8.3] - 2026-08-10
 
 ### Added
