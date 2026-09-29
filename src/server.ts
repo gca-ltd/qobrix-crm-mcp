@@ -1,5 +1,9 @@
+import { createRequire } from "node:module";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { registerTools } from "./tools/index.js";
+
+const require = createRequire(import.meta.url);
+const PACKAGE_VERSION = (require("../package.json") as { version: string }).version;
 
 export const SERVER_INSTRUCTIONS = `
 Qobrix CRM MCP Server — read-only access to a real-estate CRM aligned with RESO DD 2.0 canonical processes.
@@ -146,12 +150,33 @@ export function createServer(): McpServer {
   const server = new McpServer(
     {
       name: "qobrix-crm-mcp",
-      version: "1.6.1",
+      version: PACKAGE_VERSION,
     },
     {
       instructions: SERVER_INSTRUCTIONS,
     }
   );
+
+  const register = server.registerTool.bind(server);
+  server.tool = ((name: string, ...rest: unknown[]) => {
+    let description: string | undefined;
+    const args = [...rest];
+    if (typeof args[0] === "string") description = args.shift() as string;
+    let inputSchema: unknown;
+    if (args.length > 1 && args[0] && typeof args[0] === "object") inputSchema = args.shift();
+    const cb = args[args.length - 1];
+    return register(name, {
+      title: name.replace(/^qobrix_/, "").replaceAll("_", " "),
+      description,
+      inputSchema: inputSchema as never,
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: true,
+      },
+    }, cb as never);
+  }) as typeof server.tool;
 
   registerTools(server);
   return server;

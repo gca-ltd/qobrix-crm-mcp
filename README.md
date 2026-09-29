@@ -376,10 +376,10 @@ export QOBRIX_OAUTH_INTROSPECTION_SECRET=<shared-secret-from-bundle>
 npm start
 ```
 
-On the AS, when using a redirect allowlist, keep Claude’s callback and append exact Dust finalize URLs (never replace Claude’s entry):
+On the AS, when using a redirect allowlist, keep Claude’s callback and append exact Dust finalize URLs (never replace Claude’s entry). Cursor also needs `https://www.cursor.com/agents/mcp/oauth/callback` in addition to `cursor://` (DCR sends both plus `http://localhost:8787/callback`):
 
 ```bash
-export QOBRIX_OAUTH_REDIRECT_ALLOWLIST=https://claude.ai/api/mcp/auth_callback,http://127.0.0.1,http://localhost,cursor://,https://eu.dust.tt/oauth/mcp/finalize,https://eu.dust.tt/oauth/mcp_static/finalize,https://dust.tt/oauth/mcp/finalize,https://dust.tt/oauth/mcp_static/finalize,https://app.dust.tt/oauth/mcp/finalize,https://app.dust.tt/oauth/mcp_static/finalize
+export QOBRIX_OAUTH_REDIRECT_ALLOWLIST=https://claude.ai/api/mcp/auth_callback,http://127.0.0.1,http://localhost,cursor://,https://www.cursor.com/agents/mcp/oauth/callback,https://eu.dust.tt/oauth/mcp/finalize,https://eu.dust.tt/oauth/mcp_static/finalize,https://dust.tt/oauth/mcp/finalize,https://dust.tt/oauth/mcp_static/finalize,https://app.dust.tt/oauth/mcp/finalize,https://app.dust.tt/oauth/mcp_static/finalize
 ```
 
 Publish **HTTPS `/mcp` + PRM** (and the AS) to the public internet; allowlist Anthropic egress `160.79.104.0/21` if WAF’d, and allow Dust egress in addition — do not remove Claude’s allowlist. Mode C’s loopback/`deny public /mcp` guidance stays valid for ragchat deployments — do not flip that topology for Mode C processes.
@@ -442,7 +442,13 @@ maxmemory-samples 10
 
 ### Cursor IDE setup
 
-This server uses **stdio MCP** (a local `node` process). Cursor discovers servers from [project or user `mcp.json`](https://cursor.com/docs/mcp): `.cursor/mcp.json` inside the folder you opened, or `~/.cursor/mcp.json` for all workspaces.
+Mode A is a local **stdio** process. Mode D is the hosted URL
+`https://intranet.sharpsir.group/qobrix-crm/mcp` (same resource Claude and Dust
+use). For Mode D, see [INSTALL — Connect Cursor](docs/INSTALL.md#connect-cursor).
+
+This stdio path uses a local `node` process. Cursor discovers servers from
+[project or user `mcp.json`](https://cursor.com/docs/mcp): `.cursor/mcp.json`
+inside the folder you opened, or `~/.cursor/mcp.json` for all workspaces.
 
 #### 1. Prerequisites
 

@@ -197,14 +197,42 @@ The PRM `resource` must exactly match the MCP URL. Its first
 If a WAF restricts source networks, allow Anthropic egress
 `160.79.104.0/21`.
 
+## Connect Cursor
+
+Cursor and Claude share the **same** Mode D MCP URL and Authorization Server.
+Cursor’s Dynamic Client Registration sends **all three** redirect URIs; the AS
+allowlist must prefix-match every one:
+
+| Surface | Redirect URI | Allowlist prefix |
+|---------|--------------|------------------|
+| Desktop (custom scheme) | `cursor://anysphere.cursor-mcp/oauth/callback` | `cursor://` |
+| Desktop (loopback) | `http://localhost:8787/callback` | `http://localhost` |
+| Web / Agents | `https://www.cursor.com/agents/mcp/oauth/callback` | that exact URL |
+
+A missing prefix makes `/register` reject the client. Older AS builds mapped
+that to HTTP 500, which Cursor shows as **Internal Server Error**.
+
+1. In Cursor: **Settings → MCP** (or `~/.cursor/mcp.json`).
+2. Add a remote server (sibling of other `mcpServers` entries, not nested):
+
+```json
+"qobrix-crm-mcp": {
+  "url": "https://intranet.sharpsir.group/qobrix-crm/mcp"
+}
+```
+
+3. Reload MCP. Cursor will start OAuth; complete the Sharp Matrix Qobrix
+   authorization form and approve.
+
 ## Connect Dust
 
 Dust and Claude share the **same** Mode D MCP URL and Authorization Server.
-On the AS, keep Claude’s redirect prefix and **append** Dust finalize prefixes to
-`QOBRIX_OAUTH_REDIRECT_ALLOWLIST` (do not replace Claude’s entry):
+On the AS, keep Claude’s redirect prefix, Cursor’s HTTPS callback, and **append**
+Dust finalize prefixes to `QOBRIX_OAUTH_REDIRECT_ALLOWLIST` (do not replace
+Claude’s entry):
 
 ```bash
-QOBRIX_OAUTH_REDIRECT_ALLOWLIST=https://claude.ai/api/mcp/auth_callback,https://eu.dust.tt/oauth/mcp/finalize,https://eu.dust.tt/oauth/mcp_static/finalize,http://127.0.0.1,http://localhost,cursor://
+QOBRIX_OAUTH_REDIRECT_ALLOWLIST=https://claude.ai/api/mcp/auth_callback,https://eu.dust.tt/oauth/mcp/finalize,https://eu.dust.tt/oauth/mcp_static/finalize,http://127.0.0.1,http://localhost,cursor://,https://www.cursor.com/agents/mcp/oauth/callback
 ```
 
 Dust docs: [Adding an MCP Server](https://docs.dust.tt/docs/user-documentation/admins/tools-management/adding-an-mcp-server).

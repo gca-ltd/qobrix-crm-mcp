@@ -24,7 +24,6 @@ import { disableEnvFallback } from "./client.js";
 import { runWithAuthAsync, type AuthCredentials } from "./auth-context.js";
 import {
   resolveAuthMode,
-  modeDescription,
   isAutoHttpMode,
   MCP_PATH,
   resolveAuthModeFromRequest,
@@ -108,6 +107,19 @@ export async function startHttpServer(): Promise<void> {
   // Cloudflare -> Apache -> Node (two trusted hops for X-Forwarded-For).
   app.set("trust proxy", 2);
 
+  const allowedOrigins = (process.env.QOBRIX_MCP_ALLOWED_ORIGINS || "https://intranet.sharpsir.group")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  app.use((req, res, next) => {
+    const origin = req.header("origin");
+    if (origin && !allowedOrigins.includes(origin)) {
+      res.status(403).json({ jsonrpc: "2.0", error: { code: -32000, message: "Forbidden origin" } });
+      return;
+    }
+    next();
+  });
+
   app.use(
     rateLimit({
       windowMs: 60_000,
@@ -124,16 +136,12 @@ export async function startHttpServer(): Promise<void> {
     res.json({
       ok: true,
       transport: "http",
-      auth: autoMode ? "auto" : authMode,
-      auto_mode: autoMode,
-      dual_mode: autoMode,
-      endpoints: { [MCP_PATH]: autoMode ? "auto" : authMode },
+      auth: ["api_key", "oauth_user"],
+      endpoints: { [MCP_PATH]: "http" },
       routing: autoMode
-        ? "Bearer → oauth-claude; X-Chat-User-Id → oauth; else oauth-claude"
+        ? "Authorization Bearer selects oauth_user; an API key selects api_key"
         : undefined,
-      description: autoMode
-        ? "Auto mode: single /mcp — Bearer (Mode D) or X-Chat-* (Mode C)"
-        : modeDescription(authMode),
+      description: "Streamable HTTP. Authentication: API key or User OAuth 2.1.",
       connected:
         modeCEnabled(autoMode, authMode)
           ? Boolean(vaultCount && vaultCount > 0)
@@ -405,6 +413,12 @@ export async function startHttpServer(): Promise<void> {
 
       try {
         const authInfo = await verifier.verifyAccessToken(token);
+        const scopes = authInfo.scopes || [];
+        if (scopes.length && !scopes.includes("qobrix:read")) {
+          res.setHeader("WWW-Authenticate", `${wwwAuthenticateChallenge(resourceUrl)}, error="insufficient_scope"`);
+          res.status(403).json({ error: "insufficient_scope", error_description: "qobrix:read is required" });
+          return;
+        }
         const creds = credentialsFromAuthInfo(authInfo);
         if (!creds) {
           res.setHeader(
@@ -485,6 +499,11 @@ export async function startHttpServer(): Promise<void> {
   };
 
   const routeMcp = (req: Request, res: Response) => {
+    if (req.method === "GET" || req.method === "DELETE") {
+      res.setHeader("Allow", "POST");
+      res.status(405).json({ jsonrpc: "2.0", error: { code: -32000, message: "Method not allowed" } });
+      return;
+    }
     const routeAuthMode = resolveAuthModeFromRequest(
       req.headers,
       autoMode,
@@ -501,9 +520,7 @@ export async function startHttpServer(): Promise<void> {
     const server = app.listen(port, host, () => {
       process.stderr.write(
         `[qobrix-crm-mcp] HTTP listening on http://${host}:${port}` +
-          (autoMode
-            ? ` ${MCP_PATH} (auto: Bearer→D, X-Chat→C)`
-            : `${MCP_PATH} (${modeDescription(authMode)})`) +
+          ` ${MCP_PATH} (api_key, oauth_user)` +
           "\n"
       );
       if (modeCEnabled(autoMode, authMode)) {

@@ -11,6 +11,10 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 
 ### Added
 
+- `QOBRIX_MCP_XCHAT_LEGACY` (default on) counts signed-header requests. Set it to `0` only after seven days with a zero count; the signed-header path stays until then.
+- Tool titles and read-only annotations on every tool. `serverInfo.version` comes from `package.json`.
+- Origin allowlist (`QOBRIX_MCP_ALLOWED_ORIGINS`, default `https://intranet.sharpsir.group`). A missing Origin is allowed. `GET` and `DELETE` on `/mcp` return 405.
+- A token whose scopes omit `qobrix:read` gets 403 `insufficient_scope`.
 - **Auto HTTP mode** (`QOBRIX_MCP_AUTO_MODE=1`, alias `QOBRIX_MCP_DUAL_MODE`): one
   `/mcp` endpoint — Bearer → Mode D; `X-Chat-User-Id` → Mode C; else Mode D 401.
   Request-scoped auth via ALS (`getRequestAuthMode()`). `/mcp-c` removed.
@@ -19,6 +23,10 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 
 - Mode C routes (`/connect`, `/oauth/callback`) and Mode D PRM register when dual
   mode is enabled, even if `QOBRIX_MCP_AUTH=oauth-claude`.
+- Mode D redirect-allowlist docs now include Cursor’s HTTPS callback
+  (`https://www.cursor.com/agents/mcp/oauth/callback`) alongside `cursor://`.
+  Cursor DCR sends three URIs; omitting the HTTPS one made Cursor show
+  **Internal Server Error**. See INSTALL **Connect Cursor**.
 
 ---
 

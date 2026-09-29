@@ -28,6 +28,18 @@
 
 export type AuthMode = "env" | "headers" | "oauth" | "oauth-claude";
 
+let xchatRequests = 0;
+
+/** Signed X-Chat headers stay available until QOBRIX_MCP_XCHAT_LEGACY=0. */
+export function xchatLegacyEnabled(): boolean {
+  const raw = (process.env.QOBRIX_MCP_XCHAT_LEGACY ?? "1").toLowerCase().trim();
+  return raw === "1" || raw === "true" || raw === "yes";
+}
+
+export function xchatRequestCount(): number {
+  return xchatRequests;
+}
+
 export type TransportMode = "stdio" | "http";
 
 /** Northbound MCP path (all HTTP clients). */
@@ -80,7 +92,11 @@ export function resolveAuthModeFromRequest(
   if (auth.toLowerCase().startsWith("bearer ")) return "oauth-claude";
 
   const userId = headerOne(headers, "x-chat-user-id");
-  if (userId) return "oauth";
+  if (userId && xchatLegacyEnabled()) {
+    xchatRequests += 1;
+    console.warn(`qobrix-mcp signed-header request count=${xchatRequests}`);
+    return "oauth";
+  }
 
   return "oauth-claude";
 }

@@ -266,10 +266,13 @@ Pair with the same Enterprise OAuth AS used for Mode C (`QOBRIX_MCP_RESOURCE_URL
 
 ### 2. AS redirect allowlist (when enabled)
 
-Keep Claude’s callback and append exact Dust finalize URLs (do not replace Claude’s entry):
+Keep Claude’s callback and append exact Dust finalize URLs (do not replace Claude’s entry).
+Cursor DCR sends three redirect URIs — `cursor://…`, `http://localhost:8787/callback`,
+and `https://www.cursor.com/agents/mcp/oauth/callback` — so the allowlist must include
+the HTTPS Cursor callback as well as `cursor://` and `http://localhost`:
 
 ```bash
-export QOBRIX_OAUTH_REDIRECT_ALLOWLIST=https://claude.ai/api/mcp/auth_callback,http://127.0.0.1,http://localhost,cursor://,https://eu.dust.tt/oauth/mcp/finalize,https://eu.dust.tt/oauth/mcp_static/finalize,https://dust.tt/oauth/mcp/finalize,https://dust.tt/oauth/mcp_static/finalize,https://app.dust.tt/oauth/mcp/finalize,https://app.dust.tt/oauth/mcp_static/finalize
+export QOBRIX_OAUTH_REDIRECT_ALLOWLIST=https://claude.ai/api/mcp/auth_callback,http://127.0.0.1,http://localhost,cursor://,https://www.cursor.com/agents/mcp/oauth/callback,https://eu.dust.tt/oauth/mcp/finalize,https://eu.dust.tt/oauth/mcp_static/finalize,https://dust.tt/oauth/mcp/finalize,https://dust.tt/oauth/mcp_static/finalize,https://app.dust.tt/oauth/mcp/finalize,https://app.dust.tt/oauth/mcp_static/finalize
 ```
 
 Empty allowlist = allow all (default; Mode C local pairings keep working).
@@ -278,7 +281,7 @@ Empty allowlist = allow all (default; Mode C local pairings keep working).
 
 | Path | Role | Public? |
 |------|------|---------|
-| `POST/GET/DELETE /mcp` | Streamable HTTP MCP (Bearer required) | **Yes** (Claude.ai and Dust.tt must reach it) |
+| `POST/GET/DELETE /mcp` | Streamable HTTP MCP (Bearer required) | **Yes** (Claude.ai, Dust.tt, and Cursor must reach it) |
 | `GET /.well-known/oauth-protected-resource` | RFC 9728 PRM → AS issuer | **Yes** |
 | `GET /health` | Liveness | Prefer private |
 
