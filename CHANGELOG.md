@@ -12,6 +12,7 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 ### Fixed
 
 - The connected and error pages use the shared Matrix sign-in card (light canvas, Sharp SIR logo, navy button), the same card as the intranet sign-in page.
+- Connected and error pages follow the browser language (English, Russian, or Hungarian).
 
 ### Added
 

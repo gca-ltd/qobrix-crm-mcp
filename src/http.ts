@@ -52,7 +52,7 @@ import {
   resolveVaultKeyFromHeaders,
   vaultKeyAuditHash,
 } from "./identity.js";
-import { errorHtml, successHtml } from "./auth-pages.js";
+import { errorHtml, langFromHeader, successHtml } from "./auth-pages.js";
 
 function modeCEnabled(autoMode: boolean, authMode: AuthMode): boolean {
   return autoMode || authMode === "oauth";
@@ -212,7 +212,7 @@ export async function startHttpServer(): Promise<void> {
     app.get("/connect", async (req, res) => {
       const elicitationId = String(req.query.e || "").trim();
       if (!elicitationId) {
-        res.status(400).send(errorHtml("Missing connect parameter e="));
+        res.status(400).send(errorHtml("Missing connect parameter e=", langFromHeader(req.headers["accept-language"])));
         return;
       }
       try {
@@ -228,7 +228,7 @@ export async function startHttpServer(): Promise<void> {
         res.redirect(302, authorizeUrl);
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
-        res.status(400).send(errorHtml(msg));
+        res.status(400).send(errorHtml(msg, langFromHeader(req.headers["accept-language"])));
       }
     });
 
@@ -236,13 +236,13 @@ export async function startHttpServer(): Promise<void> {
       const err = String(req.query.error || "").trim();
       if (err) {
         const desc = String(req.query.error_description || err);
-        res.status(400).send(errorHtml(desc));
+        res.status(400).send(errorHtml(desc, langFromHeader(req.headers["accept-language"])));
         return;
       }
       const code = String(req.query.code || "").trim();
       const state = String(req.query.state || "").trim();
       if (!code || !state) {
-        res.status(400).send(errorHtml("Missing code or state"));
+        res.status(400).send(errorHtml("Missing code or state", langFromHeader(req.headers["accept-language"])));
         return;
       }
       try {
@@ -256,10 +256,10 @@ export async function startHttpServer(): Promise<void> {
           "Set-Cookie",
           `${connectCookieName()}=; Path=${connectCookiePath()}; HttpOnly; SameSite=Lax; Max-Age=0`
         );
-        res.status(200).send(successHtml(result.subject));
+        res.status(200).send(successHtml(result.subject, langFromHeader(req.headers["accept-language"])));
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
-        res.status(400).send(errorHtml(msg));
+        res.status(400).send(errorHtml(msg, langFromHeader(req.headers["accept-language"])));
       }
     });
   }

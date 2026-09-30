@@ -10,4 +10,6 @@ test("connected and error pages use the shared auth card", () => {
     assert.match(html, />Close</);
   }
   assert.match(successHtml(), /close this window/i);
+  assert.match(successHtml(undefined, "ru"), /lang="ru"/);
+  assert.match(successHtml(undefined, "ru"), /Можно закрыть это окно/);
 });
