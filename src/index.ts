@@ -2,7 +2,7 @@
 
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { createServer } from "./server.js";
-import { resolveTransport, resolveAuthMode, modeDescription } from "./modes.js";
+import { resolveTransport, resolveAuthMode, modeDescription } from "./auth-types.js";
 
 async function main(): Promise<void> {
   const transportMode = resolveTransport();
@@ -13,7 +13,7 @@ async function main(): Promise<void> {
     return;
   }
 
-  // Mode A — stdio + env (default)
+  // none — stdio + env (default)
   process.stderr.write(
     `[qobrix-crm-mcp] ${modeDescription(resolveAuthMode("stdio"))}\n`
   );

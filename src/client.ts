@@ -12,8 +12,8 @@ import {
   credentialFingerprint,
   type AuthCredentials,
 } from "./auth-context.js";
-import { resolveAuthMode } from "./modes.js";
-import type { AuthMode } from "./modes.js";
+import { resolveAuthMode } from "./auth-types.js";
+import type { AuthMode } from "./auth-types.js";
 import { getRequestAuthMode } from "./request-context.js";
 
 function effectiveAuthMode(): AuthMode {
@@ -195,7 +195,7 @@ export class QobrixClient {
     });
 
     if (!response.ok) {
-      // Mode C: expired / revoked Qobrix keys → clear vault and re-prompt connect.
+      // the signed-header path: expired / revoked Qobrix keys → clear vault and re-prompt connect.
       if (
         (response.status === 401 || response.status === 403) &&
         effectiveAuthMode() === "oauth"
@@ -270,7 +270,7 @@ export class QobrixClient {
   }
 
   /**
-   * Best-effort GET that never clears the Mode C vault and never throws on HTTP
+   * Best-effort GET that never clears the the signed-header path vault and never throws on HTTP
    * errors. Used by identity probes (whoami) where a 401 from a JWT-only endpoint
    * must not revoke a valid API-key session.
    */
@@ -298,14 +298,14 @@ export class QobrixClient {
   }
 }
 
-/** LRU of credential-scoped clients (Modes B/C). Cap keeps memory bounded. */
+/** LRU of credential-scoped clients (api_key and signed-header). Cap keeps memory bounded. */
 const CLIENT_LRU_MAX = 64;
 const _clientByFp = new Map<string, QobrixClient>();
 let _envClient: QobrixClient | null = null;
 let _envFallbackEnabled = true;
 
 /**
- * Disable the process.env credential fallback. Modes B/C call this so a tool
+ * Disable the process.env credential fallback. api_key and signed-header call this so a tool
  * that somehow runs outside the request auth scope fails closed instead of
  * silently using a shared service account.
  */
@@ -325,8 +325,8 @@ function touchLru(fp: string, client: QobrixClient): QobrixClient {
 }
 
 /**
- * Prefer AsyncLocalStorage credentials (Modes B/C); fall back to process.env (Mode A).
- * Mode C without a session vault entry throws AuthRequiredError (connect URL).
+ * Prefer AsyncLocalStorage credentials (api_key and signed-header); fall back to process.env (none).
+ * the signed-header path without a session vault entry throws AuthRequiredError (connect URL).
  */
 export function getClient(): QobrixClient {
   const ctx = getAuthContext();
@@ -342,7 +342,7 @@ export function getClient(): QobrixClient {
       throw new AuthRequiredError({ elicitationId, connectUrl });
     }
     throw new Error(
-      "No per-request Qobrix credentials in scope and env fallback is disabled (Mode B/C)"
+      "No per-request Qobrix credentials in scope and env fallback is disabled (api_key/C)"
     );
   }
   if (!_envClient) {

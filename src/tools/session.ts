@@ -1,20 +1,20 @@
 /**
- * Session / identity tools for Mode C (and sensible no-ops in Modes A/B).
+ * Session / identity tools for the signed-header path (and sensible no-ops for none and api_key).
  *
  * - qobrix_sign_in  — start interactive OAuth connect (or report already signed in)
  * - qobrix_sign_out — full revoke (AS /disconnect + Qobrix api-key DELETE + local vault)
  * - qobrix_whoami   — current user profile + capabilities + portals
  *
- * Mode C vaults are per-user: keyed by the channel-native identity forwarded
+ * the signed-header path vaults are per-user: keyed by the channel-native identity forwarded
  * as X-Chat-* headers (individual human). Deliver /connect links only to that
  * individual — never into a shared/group thread.
  */
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { getAuthContext } from "../auth-context.js";
 import { getClient } from "../client.js";
-import { resolveAuthMode, modeDescription } from "../modes.js";
+import { resolveAuthMode, modeDescription } from "../auth-types.js";
 import { getRequestAuthMode } from "../request-context.js";
-import type { AuthMode } from "../modes.js";
+import type { AuthMode } from "../auth-types.js";
 
 function effectiveAuthMode(): AuthMode {
   return getRequestAuthMode() ?? resolveAuthMode();
@@ -51,12 +51,12 @@ function displayIdentity(opts: {
 export function registerSessionTools(server: McpServer): void {
   server.tool(
     "qobrix_sign_in",
-    "Start interactive Qobrix sign-in (Mode C only). " +
+    "Start interactive Qobrix sign-in (the signed-header path only). " +
       "When not connected, returns a Sign In to Qobrix link (or native URL elicitation) " +
       "for the user to complete login + 2FA + consent. " +
       "When already connected, reports the current identity. " +
-      "In Mode A/B this is a no-op — credentials come from env / request headers. " +
-      "Mode C uses a per-user encrypted session vault keyed by the chat identity " +
+      "In none and api_key this is a no-op — credentials come from env / request headers. " +
+      "the signed-header path uses a per-user encrypted session vault keyed by the chat identity " +
       "(X-Chat-Platform / X-Chat-User-Id). Deliver the Sign In link only to that " +
       "individual — never post it into a shared/group thread.",
     SignInSchema.shape,
@@ -90,11 +90,11 @@ export function registerSessionTools(server: McpServer): void {
 
   server.tool(
     "qobrix_sign_out",
-    "Sign out of Qobrix (Mode C only). Fully revokes the current user's session: " +
+    "Sign out of Qobrix (the signed-header path only). Fully revokes the current user's session: " +
       "calls the Authorization Server /disconnect (deletes the minted Qobrix API key " +
       "and clears AS tokens/vault), then clears this user's local encrypted session vault. " +
       "Other users' vaults on this MCP process are not affected. " +
-      "In Mode A/B there is no interactive session to clear.",
+      "In none and api_key there is no interactive session to clear.",
     SignOutSchema.shape,
     async () => {
       try {
@@ -124,7 +124,7 @@ export function registerSessionTools(server: McpServer): void {
   server.tool(
     "qobrix_whoami",
     "Return the current Qobrix user profile, capabilities, and portals " +
-      "(GET /api/v2/session/). In Mode C with no session for this chat identity, " +
+      "(GET /api/v2/session/). In the signed-header path with no session for this chat identity, " +
       "surfaces a Sign In link so the user can authenticate first. Also includes " +
       "the OAuth subject when available. Use to confirm which CRM identity the " +
       "agent is acting as for this user.",
@@ -135,7 +135,7 @@ export function registerSessionTools(server: McpServer): void {
         const creds = getSessionCredentials();
         const ctx = getAuthContext();
 
-        // Cold Mode C: throw AuthRequiredError → Sign In link. Never probes
+        // Cold the signed-header path: throw AuthRequiredError → Sign In link. Never probes
         // session/ through fetchUpstream (that would clear the vault on 401).
         const client = getClient();
 
@@ -160,7 +160,23 @@ export function registerSessionTools(server: McpServer): void {
           }
         }
 
+        const profileRecord = profile && typeof profile === "object"
+          ? profile as Record<string, unknown>
+          : undefined;
+        const userRecord = profileRecord?.user && typeof profileRecord.user === "object"
+          ? profileRecord.user as Record<string, unknown>
+          : profileRecord;
+        const emailValue = [userRecord?.email, userRecord?.username, profileRecord?.email]
+          .find((v) => typeof v === "string" && v.includes("@"));
+        const nameValue = [userRecord?.name, userRecord?.display_name, profileRecord?.name]
+          .find((v) => typeof v === "string" && v.trim());
+        const idValue = [userRecord?.id, profileRecord?.id].find((v) => typeof v === "string" || typeof v === "number");
+
         const payload: Record<string, unknown> = {
+          email: typeof emailValue === "string" ? emailValue : null,
+          user_id: idValue != null ? String(idValue) : userId || null,
+          display_name: typeof nameValue === "string" ? nameValue : null,
+          scope: "qobrix:read",
           auth_mode: mode,
         };
         if (mode === "oauth" && creds?.subject) {

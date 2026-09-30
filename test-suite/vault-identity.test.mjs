@@ -1,5 +1,5 @@
 /**
- * Unit tests for Mode C per-user vaults + signed identity (no live AS).
+ * Unit tests for the signed-header path per-user vaults + signed identity (no live AS).
  */
 import { describe, it, before, after, beforeEach } from "node:test";
 import assert from "node:assert/strict";
@@ -14,7 +14,7 @@ const STATE_SECRET = "test-state-secret-" + randomBytes(8).toString("hex");
 const IDENTITY_SECRET =
   "test-identity-secret-" + randomBytes(8).toString("hex");
 
-describe("Mode C per-user vaults + identity", () => {
+describe("the signed-header path per-user vaults + identity", () => {
   let dataDir;
   /** @type {typeof import('../dist/oauth-client.js')} */
   let oauth;

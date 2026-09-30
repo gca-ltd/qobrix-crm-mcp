@@ -1,5 +1,5 @@
 /**
- * Signed chat-identity assertion for Mode C per-user vaults.
+ * Signed chat-identity assertion for the signed-header path per-user vaults.
  *
  * ragchat (or any trusted loopback caller) sends:
  *   X-Chat-Platform, X-Chat-User-Id, X-Chat-Identity-Iat,

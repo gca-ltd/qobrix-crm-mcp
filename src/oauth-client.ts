@@ -1,5 +1,5 @@
 /**
- * Mode C — self-service OAuth client for qobrix-crm-mcp.
+ * the signed-header path — self-service OAuth client for qobrix-crm-mcp.
  *
  * The MCP registers itself (DCR + PKCE) against the paired
  * qobrix-crm-mcp-oauth AS, drives /connect → authorize → /oauth/callback,
@@ -166,7 +166,7 @@ function stateSecret(): string {
     "";
   if (!s || s.length < 16) {
     throw new Error(
-      "Mode C requires QOBRIX_MCP_STATE_SECRET (16+ chars) for signed cookies and vault encryption"
+      "the signed-header path requires QOBRIX_MCP_STATE_SECRET (16+ chars) for signed cookies and vault encryption"
     );
   }
   return s;
@@ -581,7 +581,7 @@ export function clearSession(vaultKey?: string | null): void {
 }
 
 /**
- * Full Mode C disconnect: revoke at the AS (deletes minted Qobrix API key +
+ * Full the signed-header path disconnect: revoke at the AS (deletes minted Qobrix API key +
  * AS vault/tokens), fall back to direct Qobrix api-key DELETE if needed, then
  * clear the local session vault for this vaultKey.
  */
@@ -1144,7 +1144,7 @@ export async function refreshIfNeeded(
   return p;
 }
 
-/** Test helper — wipe in-memory + on-disk Mode C state (tests only). */
+/** Test helper — wipe in-memory + on-disk the signed-header path state (tests only). */
 export function __resetOauthClientForTests(): void {
   _client = null;
   _sessions.clear();

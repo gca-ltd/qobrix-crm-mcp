@@ -1,10 +1,10 @@
 /**
- * OAuth 2.1 Resource Server helpers (Mode C metadata + Mode D Bearer RS).
+ * OAuth 2.1 Resource Server helpers (the signed-header path metadata + oauth_user Bearer RS).
  *
  * Pairs exclusively with qobrix-crm-mcp-oauth (QOBRIX_OAUTH_ISSUER).
- * Mode D validates bearer tokens via the companion's introspection endpoint
+ * oauth_user validates bearer tokens via the companion's introspection endpoint
  * and resolves per-user Qobrix credentials into AuthInfo.extra for ALS.
- * Mode C uses the same env/issuer helpers for /connect pairing.
+ * the signed-header path uses the same env/issuer helpers for /connect pairing.
  */
 
 import { createHash } from "node:crypto";
@@ -14,7 +14,7 @@ import type { OAuthTokenVerifier } from "@modelcontextprotocol/sdk/server/auth/p
 import { checkResourceAllowed } from "@modelcontextprotocol/sdk/shared/auth-utils.js";
 import type { AuthCredentials } from "./auth-context.js";
 
-/** Max AuthInfo entries kept after successful introspection (Mode D). */
+/** Max AuthInfo entries kept after successful introspection (oauth_user). */
 const INTROSPECT_CACHE_MAX = 512;
 /** Upper bound on positive-cache TTL (seconds). */
 const INTROSPECT_CACHE_MAX_TTL_SEC = 30;
@@ -44,7 +44,7 @@ export function requireOAuthEnv(): {
   const issuerRaw = process.env.QOBRIX_OAUTH_ISSUER;
   if (!issuerRaw) {
     throw new Error(
-      "Mode C requires QOBRIX_OAUTH_ISSUER (URL of the paired qobrix-crm-mcp-oauth)"
+      "the signed-header path requires QOBRIX_OAUTH_ISSUER (URL of the paired qobrix-crm-mcp-oauth)"
     );
   }
   const resourceRaw =
@@ -54,7 +54,7 @@ export function requireOAuthEnv(): {
   const secret = process.env.QOBRIX_OAUTH_INTROSPECTION_SECRET;
   if (!secret) {
     throw new Error(
-      "Mode C requires QOBRIX_OAUTH_INTROSPECTION_SECRET (shared with qobrix-crm-mcp-oauth)"
+      "the signed-header path requires QOBRIX_OAUTH_INTROSPECTION_SECRET (shared with qobrix-crm-mcp-oauth)"
     );
   }
   return {
@@ -95,7 +95,7 @@ export async function fetchAuthorizationServerMetadata(
   const got = String(meta.issuer).replace(/\/+$/, "");
   if (got !== expected) {
     throw new Error(
-      `AS issuer mismatch: expected ${expected}, got ${got}. Mode C pairs only with qobrix-crm-mcp-oauth.`
+      `AS issuer mismatch: expected ${expected}, got ${got}. the signed-header path pairs only with qobrix-crm-mcp-oauth.`
     );
   }
   // SDK createOAuthMetadata omits introspection_endpoint; companion serves /introspect.
@@ -116,7 +116,7 @@ function tokenCacheKey(token: string): string {
 }
 
 /**
- * Mode D Bearer verifier with a short-TTL positive cache.
+ * oauth_user Bearer verifier with a short-TTL positive cache.
  * Avoids an /introspect round-trip (and AS rate-limit pressure) on every
  * /mcp call. Failures and inactive tokens are never cached.
  */
@@ -245,7 +245,7 @@ export function credentialsFromAuthInfo(
   return undefined;
 }
 
-/** RFC 9728 Protected Resource Metadata for Mode D (Claude connectors). */
+/** RFC 9728 Protected Resource Metadata for oauth_user (Claude connectors). */
 export function buildProtectedResourceMetadata(opts: {
   resourceServerUrl: URL;
   issuer: URL;

@@ -1,17 +1,17 @@
 /**
  * Per-request MCP server handle so tool handlers can inspect client
  * capabilities (e.g. URL-mode elicitation) and send completion notifications.
- * Also carries the Mode C vaultKey for per-user session isolation.
+ * Also carries the the signed-header path vaultKey for per-user session isolation.
  */
 
 import { AsyncLocalStorage } from "node:async_hooks";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import type { AuthMode } from "./modes.js";
+import type { AuthMode } from "./auth-types.js";
 import { DEFAULT_VAULT_KEY } from "./identity.js";
 
 export type RequestContext = {
   mcpServer?: McpServer;
-  /** Mode C per-user vault key (`{platform}:{userId}` or `default`). */
+  /** the signed-header path per-user vault key (`{platform}:{userId}` or `default`). */
   vaultKey?: string;
   /** HTTP auth mode for this MCP request (dual-mode per-path routing). */
   authMode?: AuthMode;

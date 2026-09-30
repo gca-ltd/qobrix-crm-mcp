@@ -1,10 +1,10 @@
 /**
- * Smoke / regression tests for Mode A/B/C/D wiring (no live Qobrix required).
+ * Smoke / regression tests for none and api_key/C/D wiring (no live Qobrix required).
  *
- * Mode C (1.4+): self-service OAuth — /mcp has no bearer gate; tools surface
+ * the signed-header path (1.4+): self-service OAuth — /mcp has no bearer gate; tools surface
  * a /connect URL; AS advertises S256 + exact redirect_uri.
- * Mode D (1.7+): Claude.ai connector — PRM + 401 WWW-Authenticate + Bearer.
- * Existing Mode B/C cases below are unchanged.
+ * oauth_user (1.7+): Claude.ai connector — PRM + 401 WWW-Authenticate + Bearer.
+ * Existing api_key/C cases below are unchanged.
  */
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
@@ -142,7 +142,7 @@ async function readJsonRpc(res) {
 }
 
 describe("modes + open-core pairing", () => {
-  it("Mode B: HTTP rejects missing headers and accepts X-Api-*", async () => {
+  it("api_key: HTTP rejects missing headers and accepts X-Api-*", async () => {
     const child = spawnNode(MCP_ROOT, ["dist/index.js"], {
       QOBRIX_MCP_TRANSPORT: "http",
       QOBRIX_MCP_AUTH: "headers",
@@ -182,7 +182,7 @@ describe("modes + open-core pairing", () => {
     }
   });
 
-  it("Mode C + companion: AS S256, DCR, /mcp without bearer, /connect rejects bad e=", async () => {
+  it("the signed-header path + companion: AS S256, DCR, /mcp without bearer, /connect rejects bad e=", async () => {
     const dataDir = join(
       tmpdir(),
       "qobrix-oauth-test-" + randomBytes(4).toString("hex")
@@ -262,7 +262,7 @@ describe("modes + open-core pairing", () => {
       assert.ok(client.client_id);
       assert.ok(client.redirect_uris.includes(redirectUri));
 
-      // /mcp accepts initialize WITHOUT bearer (self-service Mode C)
+      // /mcp accepts initialize WITHOUT bearer (self-service the signed-header path)
       const init = await mcpInitialize(resource);
       assert.ok(
         init.status === 200 || init.status === 202,
@@ -359,7 +359,7 @@ describe("modes + open-core pairing", () => {
       const signOutText = JSON.stringify(signOutRpc.result || signOutRpc);
       assert.match(signOutText, /No active Qobrix session/i);
 
-      // Fingerprint helper sanity (Mode B/C cache scoping)
+      // Fingerprint helper sanity (api_key/C cache scoping)
       const fp = createHash("sha256").update("u|k").digest("hex").slice(0, 16);
       assert.equal(fp.length, 16);
     } finally {
@@ -378,7 +378,7 @@ describe("modes + open-core pairing", () => {
     }
   });
 
-  it("Mode D: PRM shape, 401 challenge, Bearer reject/accept + audience", async () => {
+  it("oauth_user: PRM shape, 401 challenge, Bearer reject/accept + audience", async () => {
     const dataDir = join(
       tmpdir(),
       "qobrix-oauth-d-test-" + randomBytes(4).toString("hex")
@@ -452,7 +452,7 @@ describe("modes + open-core pairing", () => {
 
     const mcp = spawnNode(MCP_ROOT, ["dist/index.js"], {
       QOBRIX_MCP_TRANSPORT: "http",
-      QOBRIX_MCP_AUTH: "oauth-claude",
+      QOBRIX_MCP_AUTH: "oauth_user",
       QOBRIX_MCP_HOST: "127.0.0.1",
       QOBRIX_MCP_PORT: String(PORT_MCP_D),
       QOBRIX_OAUTH_ISSUER: issuer,
@@ -470,7 +470,7 @@ describe("modes + open-core pairing", () => {
       const health = await fetch(`http://127.0.0.1:${PORT_MCP_D}/health`);
       assert.equal(health.status, 200);
       const healthBody = await health.json();
-      assert.equal(healthBody.auth, "oauth-claude");
+      assert.equal(healthBody.auth, "oauth_user");
 
       // RFC 9728 PRM
       const prm = await fetch(
@@ -656,13 +656,13 @@ describe("modes + open-core pairing", () => {
     }
   });
 
-  it("Mode D: introspection cache survives low AS /introspect rate limit", async () => {
+  it("oauth_user: introspection cache survives low AS /introspect rate limit", async () => {
     const dataDir = join(
       tmpdir(),
       "qobrix-oauth-d-cache-" + randomBytes(4).toString("hex")
     );
     mkdirSync(dataDir, { recursive: true });
-    // Dedicated ports so this can run after the other Mode D case.
+    // Dedicated ports so this can run after the other oauth_user case.
     const portAs = 13507;
     const portMcp = 13508;
     const resource = `http://127.0.0.1:${portMcp}/mcp`;
@@ -722,7 +722,7 @@ describe("modes + open-core pairing", () => {
 
     const mcp = spawnNode(MCP_ROOT, ["dist/index.js"], {
       QOBRIX_MCP_TRANSPORT: "http",
-      QOBRIX_MCP_AUTH: "oauth-claude",
+      QOBRIX_MCP_AUTH: "oauth_user",
       QOBRIX_MCP_HOST: "127.0.0.1",
       QOBRIX_MCP_PORT: String(portMcp),
       QOBRIX_OAUTH_ISSUER: issuer,
@@ -774,7 +774,7 @@ describe("modes + open-core pairing", () => {
     }
   });
 
-  it("Mode C elicitation client: tools/call returns -32042 with /connect URL", async () => {
+  it("the signed-header path elicitation client: tools/call returns -32042 with /connect URL", async () => {
     const dataDir = join(
       tmpdir(),
       "qobrix-oauth-test-" + randomBytes(4).toString("hex")
@@ -870,7 +870,7 @@ describe("modes + open-core pairing", () => {
     }
   });
 
-  it("Auto mode: single /mcp — no headers → 401; X-Chat-User-Id → 200", async () => {
+  it("api_key,oauth_user: single /mcp — no headers → 401; X-Chat-User-Id → 200", async () => {
     const dataDir = join(
       tmpdir(),
       "qobrix-oauth-auto-" + randomBytes(4).toString("hex")
@@ -901,8 +901,7 @@ describe("modes + open-core pairing", () => {
 
     const mcp = spawnNode(MCP_ROOT, ["dist/index.js"], {
       QOBRIX_MCP_TRANSPORT: "http",
-      QOBRIX_MCP_AUTH: "oauth-claude",
-      QOBRIX_MCP_DUAL_MODE: "1",
+      QOBRIX_MCP_AUTH: "api_key,oauth_user",
       QOBRIX_MCP_HOST: "127.0.0.1",
       QOBRIX_MCP_PORT: String(portMcp),
       QOBRIX_OAUTH_ISSUER: issuer,
@@ -922,8 +921,8 @@ describe("modes + open-core pairing", () => {
       const health = await fetch(`http://127.0.0.1:${portMcp}/health`);
       assert.equal(health.status, 200);
       const healthBody = await health.json();
-      assert.equal(healthBody.auth, "auto");
-      assert.equal(healthBody.auto_mode, true);
+      assert.deepEqual(healthBody.auth, ["api_key", "oauth_user"]);
+      assert.equal(typeof healthBody.signed_header_requests, "number");
 
       const noHdr = await fetch(resource, {
         method: "POST",
@@ -951,7 +950,7 @@ describe("modes + open-core pairing", () => {
           "Content-Type": "application/json",
           Accept: "application/json, text/event-stream",
           "X-Chat-Platform": "matrix",
-          "X-Chat-User-Id": "user-auto-mode-test",
+          "X-Chat-User-Id": "user-signed-header-test",
         },
         body: JSON.stringify({
           jsonrpc: "2.0",
@@ -966,7 +965,7 @@ describe("modes + open-core pairing", () => {
       });
       assert.ok(
         chatInit.status === 200 || chatInit.status === 202,
-        `X-Chat headers should route to Mode C, got ${chatInit.status}`
+        `X-Chat headers should route to the signed-header path, got ${chatInit.status}`
       );
 
       const gone = await fetch(`http://127.0.0.1:${portMcp}/mcp-c`, {

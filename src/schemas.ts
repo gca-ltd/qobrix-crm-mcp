@@ -1000,15 +1000,15 @@ export const CacheClearSchema = z.object({
 });
 
 // ---------------------------------------------------------------------------
-// Session / identity (Mode C sign-in / out / whoami)
+// Session / identity (the signed-header path sign-in / out / whoami)
 // ---------------------------------------------------------------------------
 
 export const SignInSchema = z.object({}).describe(
-  "No arguments. Starts Mode C interactive sign-in (or reports already connected)."
+  "No arguments. Starts the signed-header path interactive sign-in (or reports already connected)."
 );
 
 export const SignOutSchema = z.object({}).describe(
-  "No arguments. Revokes the Mode C session (AS disconnect + Qobrix API key delete + local vault clear)."
+  "No arguments. Revokes the the signed-header path session (AS disconnect + Qobrix API key delete + local vault clear)."
 );
 
 export const WhoAmISchema = z.object({}).describe(

@@ -11,16 +11,16 @@
     "build": "tsc && mkdir -p dist/assets && cp src/assets/sharp-sir-logo.svg dist/assets/",
     "dev": "tsc --watch",
     "start": "node dist/index.js",
-    "test": "node -r ./test-suite/load-env.cjs --test test-suite/integration.test.mjs",
+    "test": "node tools/mcp-conformance/check-mcp-terminology.mjs && node -r ./test-suite/load-env.cjs --test test-suite/integration.test.mjs",
     "test:scenarios": "node -r ./test-suite/load-env.cjs --test test-suite/scenarios.test.mjs",
     "test:workflows": "node -r ./test-suite/load-env.cjs --test test-suite/workflows.test.mjs",
     "test:cache": "node --test test-suite/cache.test.mjs",
     "test:format": "node --test test-suite/format.test.mjs",
     "test:client-sort": "node --test test-suite/client-sort.test.mjs",
     "test:relevance": "node --test test-suite/relevance.test.mjs",
-    "test:oauth-modes": "node --test --test-concurrency=1 test-suite/oauth-modes.test.mjs",
+    "test:auth-types": "node tools/mcp-conformance/check-mcp-terminology.mjs && node --test --test-concurrency=1 test-suite/auth-types.unit.test.mjs",
     "test:vault-identity": "node --test test-suite/vault-identity.test.mjs",
-    "test:all": "node -r ./test-suite/load-env.cjs --test test-suite/integration.test.mjs test-suite/scenarios.test.mjs test-suite/workflows.test.mjs test-suite/cache.test.mjs test-suite/format.test.mjs test-suite/client-sort.test.mjs test-suite/relevance.test.mjs test-suite/oauth-modes.test.mjs test-suite/vault-identity.test.mjs"
+    "test:all": "node -r ./test-suite/load-env.cjs --test test-suite/integration.test.mjs test-suite/scenarios.test.mjs test-suite/workflows.test.mjs test-suite/cache.test.mjs test-suite/format.test.mjs test-suite/client-sort.test.mjs test-suite/relevance.test.mjs test-suite/auth-types.test.mjs test-suite/auth-types.unit.test.mjs test-suite/vault-identity.test.mjs"
   },
   "keywords": [
     "mcp",

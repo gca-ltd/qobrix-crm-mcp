@@ -1,5 +1,5 @@
 /**
- * Mode C browser pages after /oauth/callback.
+ * the signed-header path browser pages after /oauth/callback.
  * Visual shell matches qobrix-crm-mcp-oauth Sharp Matrix login (duplicated CSS —
  * no cross-repo import).
  */
@@ -178,7 +178,7 @@ function shellPage(opts: {
 </html>`;
 }
 
-/** Successful Mode C callback — vault written. */
+/** Successful the signed-header path callback — vault written. */
 export function successHtml(subject?: string): string {
   const who =
     subject && subject.trim()
@@ -199,7 +199,7 @@ export function successHtml(subject?: string): string {
   });
 }
 
-/** Failed Mode C callback or /connect error. */
+/** Failed the signed-header path callback or /connect error. */
 export function errorHtml(message: string): string {
   return shellPage({
     title: "Authorization failed — Sharp Matrix",

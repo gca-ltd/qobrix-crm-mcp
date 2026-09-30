@@ -73,7 +73,7 @@ export function cacheKey(
   method: string,
   path: string,
   params?: Record<string, unknown>,
-  /** Credential fingerprint so Mode B/C users never share cached rows. */
+  /** Credential fingerprint so api_key/C users never share cached rows. */
   credentialFp?: string
 ): string {
   const canon = JSON.stringify(canonicalize(params ?? {}));

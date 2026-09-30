@@ -2,7 +2,7 @@ import { AsyncLocalStorage } from "node:async_hooks";
 import { createHash } from "node:crypto";
 
 /**
- * Per-request Qobrix credentials for Modes B and C.
+ * Per-request Qobrix credentials for api_key and the signed-header path.
  * Tools continue to call getClient(); the factory prefers ALS over env.
  */
 export type AuthCredentials = {
@@ -10,7 +10,7 @@ export type AuthCredentials = {
   apiKey: string;
   apiUrl?: string;
   locale?: string;
-  /** OAuth subject (Mode C). */
+  /** OAuth subject (the signed-header path). */
   subject?: string;
 };
 

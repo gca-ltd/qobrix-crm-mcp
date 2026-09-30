@@ -39,7 +39,8 @@ function allowed(rel) {
 
 function walk(dir, out = []) {
   for (const name of readdirSync(dir)) {
-    if (name === "node_modules" || name === "dist" || name === ".git") continue;
+    if (name === "node_modules" || name === "dist" || name === ".git" || name === "data") continue;
+    if (name === ".env" || name === ".env.local") continue;
     const path = join(dir, name);
     const st = statSync(path);
     if (st.isDirectory()) walk(path, out);

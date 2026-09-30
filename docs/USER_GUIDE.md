@@ -6,19 +6,19 @@ Connect [Claude.ai](https://claude.ai/), [Dust.tt](https://dust.tt/), Cursor, Ch
 **Tools:** **64** MCP tools (entities, analytics, reporting, audit, cache, session/identity). Full list: [README — Tools at a Glance](../README.md#tools-at-a-glance).  
 **Changelog:** [`CHANGELOG.md`](../CHANGELOG.md).
 
-| Mode | Transport | Credentials | Best for |
-|------|-----------|-------------|----------|
-| **A** (default) | stdio | Shared `QOBRIX_API_*` env | Local IDE, one shared CRM identity |
-| **B** | HTTP | Per-request `X-Api-User` / `X-Api-Key` | Trusted private callers (localhost ragchat, internal services) |
-| **C** (needs Enterprise OAuth AS) | HTTP | Self-service OAuth (`/connect` → login) | ragchat / elicitation hosts; per-user vaults via `X-Chat-*` |
-| **D** (needs Enterprise OAuth AS, opt-in) | HTTP | Client OAuth (PRM + Bearer on `/mcp`) | **Claude.ai** / Desktop custom connectors **and Dust.tt** Spaces tools (shared resource URL) |
+| Auth type | Transport | Credentials | Best for |
+|-----------|-----------|-------------|----------|
+| **none** (default) | stdio | Shared `QOBRIX_API_*` env | Local IDE, one shared CRM identity |
+| **api_key** | HTTP | `Authorization: Bearer <user>:<key>`, or `X-Api-User` / `X-Api-Key` | Trusted private callers (localhost ragchat, internal services) |
+| **signed-header** (legacy, needs Enterprise OAuth AS) | HTTP | Self-service OAuth (`/connect` → login) | ragchat / elicitation hosts; per-user vaults via `X-Chat-*` |
+| **oauth_user** (needs Enterprise OAuth AS) | HTTP | Client OAuth (PRM + Bearer on `/mcp`) | **Claude.ai** / Desktop custom connectors **and Dust.tt** Spaces tools (shared resource URL) |
 
-**Prerequisites:** Node.js **≥ 20**, a Qobrix tenant URL, and API credentials (Modes A/B) or SharpSir’s **Enterprise OAuth** bundle (Modes C/D).
+**Prerequisites:** Node.js **≥ 20**, a Qobrix tenant URL, and API credentials (`none` or `api_key`) or SharpSir’s **Enterprise OAuth** bundle (signed-header or `oauth_user`).
 
 ```bash
 git clone https://github.com/gca-ltd/qobrix-crm-mcp.git
 cd qobrix-crm-mcp
-cp .env.example .env   # fill QOBRIX_API_* for Modes A/B
+cp .env.example .env   # fill QOBRIX_API_* for none or api_key
 npm install
 npm run build
 ```
@@ -27,14 +27,14 @@ npm run build
 
 ## Which mode do I want?
 
-- **Mode A** — Cursor / Claude Desktop **local** (stdio) for yourself with one service account.
-- **Mode B** — a trusted backend already holds Qobrix keys and can send them as headers on every `/mcp` call.
-- **Mode C** — end user signs in via `/connect` (login + 2FA + consent) so tools run as that CRM user (ragchat / elicitation). Requires the proprietary **Enterprise OAuth** Authorization Server (delivered on request — [sharpsir.group](https://sharpsir.group) · [dev@sharpsir.group](mailto:dev@sharpsir.group)). Keep `/mcp` on localhost.
-- **Mode D** — remote MCP OAuth for **Claude.ai** / Desktop custom connectors **and Dust.tt** Spaces tools (paste HTTPS `/mcp` URL → Connect). Same Enterprise OAuth AS as Mode C; the host drives client OAuth (PRM + Bearer). Does **not** replace Mode C — run a separate process with `QOBRIX_MCP_AUTH=oauth-claude`. Claude and Dust share one resource URL.
+- **none** — Cursor / Claude Desktop **local** (stdio) for yourself with one service account.
+- **api_key** — a trusted backend already holds Qobrix keys and can send them as headers on every `/mcp` call.
+- **the signed-header path** — end user signs in via `/connect` (login + 2FA + consent) so tools run as that CRM user (ragchat / elicitation). Requires the proprietary **Enterprise OAuth** Authorization Server (delivered on request — [sharpsir.group](https://sharpsir.group) · [dev@sharpsir.group](mailto:dev@sharpsir.group)). Keep `/mcp` on localhost.
+- **oauth_user** — remote MCP OAuth for **Claude.ai** / Desktop custom connectors **and Dust.tt** Spaces tools (paste HTTPS `/mcp` URL → Connect). Same Enterprise OAuth AS as the signed-header path; the host drives client OAuth (PRM + Bearer). Does **not** replace the signed-header path — run a separate process with `QOBRIX_MCP_AUTH=oauth_user`. Claude and Dust share one resource URL.
 
 ---
 
-## Mode A — stdio + shared API key
+## none — stdio + shared API key
 
 Simplest path. The MCP process reads credentials from the environment and speaks stdio to the host.
 
@@ -45,7 +45,7 @@ QOBRIX_API_URL=https://yourcrm.qobrix.com
 QOBRIX_API_USER=your-api-user-uuid
 QOBRIX_API_KEY=your-api-key
 QOBRIX_LOCALE=en-US
-# leave transport unset (default stdio) — Mode A
+# leave transport unset (default stdio) — none
 ```
 
 ### 2. Run
@@ -82,11 +82,11 @@ Ask the agent: *“How many available properties are in the CRM?”* — it shou
 top-N or nullable fields that return no rows under server sort, use
 `qobrix_top_records` / `qobrix_aggregate` instead.
 
-**Security:** Mode A is a shared identity. Do not expose the stdio process over the network. (HTTP + `QOBRIX_MCP_AUTH=env` also exists in code for shared-env over HTTP — prefer Mode B/C for multi-caller deployments.)
+**Security:** none is a shared identity. Do not expose the stdio process over the network. (HTTP + `QOBRIX_MCP_AUTH=env` also exists in code for shared-env over HTTP — prefer api_key/C for multi-caller deployments.)
 
 ---
 
-## Mode B — HTTP + per-request headers
+## api_key — HTTP + per-request headers
 
 For trusted callers that already know the Qobrix credentials to use on each request. No OAuth. Env shared-key fallback is **disabled** — missing headers → error (no silent fall-back to `.env` API keys).
 
@@ -126,11 +126,11 @@ curl -s -X POST http://127.0.0.1:3502/mcp \
 
 Point a streamable-HTTP MCP server entry at `http://127.0.0.1:3502/mcp` and forward the caller’s Qobrix credentials as the headers above on each request.
 
-**Security:** Bind to loopback (or a private network). Mode B has no client OAuth — anyone who can reach `/mcp` and forge headers can act as that CRM user.
+**Security:** Bind to loopback (or a private network). api_key has no client OAuth — anyone who can reach `/mcp` and forge headers can act as that CRM user.
 
 ---
 
-## Mode C — self-service Enterprise OAuth
+## the signed-header path — self-service Enterprise OAuth
 
 The MCP becomes its **own** OAuth client and session holder. Northbound agents need **no** bearer wiring: when a tool needs auth, the MCP returns a `/connect` URL; the user signs in; the next tool call runs as that user.
 
@@ -177,7 +177,7 @@ export MCP_DANGEROUSLY_ALLOW_INSECURE_ISSUER_URL=true
 
 ### 2. What the user sees in chat
 
-Mode C stores a **per-user** encrypted vault keyed by the chat identity the
+the signed-header path stores a **per-user** encrypted vault keyed by the chat identity the
 host forwards (`X-Chat-Platform` / `X-Chat-User-Id`, optionally signed with
 `QOBRIX_MCP_IDENTITY_SECRET`). Teams/Telegram/WhatsApp/web each map to their
 native individual id — signing in as Alice never overwrites Bob's vault.
@@ -191,7 +191,7 @@ Deliver the Sign In link **only to that individual** (never into a group thread)
 4. AS redirects to `{PUBLIC_URL}/oauth/callback` → PKCE exchange + introspection → encrypted session vault (`session.enc`). The browser shows a **Connected** (or error) page in the same Sharp Matrix card shell as the login form, with a **Close** button — close the window and return to the chat to continue.
 5. User retries — tools run with that user’s minted Qobrix API key.
 6. **`qobrix_whoami`** returns the current profile (`user` + `capabilities` + `portals`, plus OAuth `subject` when available).
-7. **`qobrix_sign_out`** fully revokes: AS `/disconnect` (Bearer) deletes the minted Qobrix API key and clears the AS vault/tokens, then the local vault is wiped. Mode C uses one shared vault — sign-out disconnects the shared identity for this MCP process.
+7. **`qobrix_sign_out`** fully revokes: AS `/disconnect` (Bearer) deletes the minted Qobrix API key and clears the AS vault/tokens, then the local vault is wiped. the signed-header path uses one shared vault — sign-out disconnects the shared identity for this MCP process.
 
 ### 3. Endpoints
 
@@ -199,21 +199,21 @@ Deliver the Sign In link **only to that individual** (never into a group thread)
 |------|---------|---------|
 | `GET /connect?e=…` | Start auth (cookie + 302 to AS) | Yes (browser) |
 | `GET /oauth/callback` | Code exchange + vault write | Yes (browser) |
-| `GET /health` | Liveness; Mode C includes `connected: true/false` | Prefer localhost only |
-| `POST/GET/DELETE /mcp` | Streamable HTTP MCP (no client bearer in Mode C) | Prefer localhost only |
+| `GET /health` | Liveness; the signed-header path includes `connected: true/false` | Prefer localhost only |
+| `POST/GET/DELETE /mcp` | Streamable HTTP MCP (no client bearer in the signed-header path) | Prefer localhost only |
 
 ### 4. Gotchas (production)
 
 - Always set **`QOBRIX_MCP_RESOURCE_URL`** to the full public `/mcp` URL.
 - DCR `redirect_uri` must equal `{PUBLIC_URL}/oauth/callback` exactly (re-register / clear `DATA_DIR` client if you change the public URL).
 - Persist **`QOBRIX_MCP_DATA_DIR`** (DCR client + session vault).
-- **Single active session — one CRM identity per MCP process.** Whoever completes `/connect` last is the identity every tool call uses. Do not share one Mode C process across unrelated end users; use Mode B for per-request isolation, or run one process per tenant/user.
+- **Single active session — one CRM identity per MCP process.** Whoever completes `/connect` last is the identity every tool call uses. Do not share one the signed-header path process across unrelated end users; use api_key for per-request isolation, or run one process per tenant/user.
 - **`/mcp` has no client bearer.** Bind `QOBRIX_MCP_HOST` to loopback. If you reverse-proxy for browsers, **publish only `/connect` and `/oauth/callback`**; deny public `/mcp` and `/health` (e.g. Apache `Require all denied`). Agents such as ragchat must call `http://127.0.0.1:<port>/mcp` on the host.
 - **Host allowlist:** set `QOBRIX_MCP_ALLOWED_HOSTS` to the public hostname. Loopback Host values are merged automatically when bind host is loopback — otherwise ragchat gets `403 Invalid Host: 127.0.0.1`.
 - **Cookies:** connect cookie `Path` follows `QOBRIX_MCP_PUBLIC_URL` pathname (avoids reverse-proxy `ProxyPassReverseCookiePath` rewrites stealing `Path=/`).
 - **Proxies:** Express `trust proxy` is **2** (Cloudflare → Apache → Node) so rate-limit IP keying is correct.
 - Prefer **subdomain** URLs for the AS. Path mounts work when the AS issuer includes the path, login POST is relative, and well-known discovery is proxied carefully (see AS User Guide).
-- Reference production (Sharp Matrix intranet): public Mode D MCP at `https://intranet.sharpsir.group/qobrix-crm/mcp` with AS at `https://intranet.sharpsir.group/qobrix-crm/mcp-oauth`. See [INSTALL.md](./INSTALL.md).
+- Reference production (Sharp Matrix intranet): public oauth_user MCP at `https://intranet.sharpsir.group/qobrix-crm/mcp` with AS at `https://intranet.sharpsir.group/qobrix-crm/mcp-oauth`. See [INSTALL.md](./INSTALL.md).
 
 ### 5. Verify
 
@@ -236,33 +236,33 @@ Automated smoke: `npm run test:oauth-modes`.
 
 ---
 
-## Mode D — Claude.ai and Dust.tt remote MCP (opt-in)
+## oauth_user — Claude.ai and Dust.tt remote MCP (opt-in)
 
-Mode D is **additive**. It does not change Mode A/B/C behavior. Remote hosts such as Claude.ai and Dust.tt require a `401` + `WWW-Authenticate` on the first unauthenticated `/mcp` call; Mode C intentionally returns `200` + a `/connect` URL there for ragchat — so remote-connector support lives in a separate auth mode.
+oauth_user is **additive**. It does not change none and api_key/C behavior. Remote hosts such as Claude.ai and Dust.tt require a `401` + `WWW-Authenticate` on the first unauthenticated `/mcp` call; the signed-header path intentionally returns `200` + a `/connect` URL there for ragchat — so remote-connector support lives in a separate auth mode.
 
-**Supported Mode D hosts (same MCP URL):**
+**Supported oauth_user hosts (same MCP URL):**
 
 | Host | Docs |
 |------|------|
 | [Claude.ai](https://claude.ai/) / Claude Desktop | [INSTALL — Connect Claude](./INSTALL.md#connect-claude) · [Claude connector authentication](https://claude.com/docs/connectors/building/authentication) |
 | [Dust.tt](https://dust.tt/) | [INSTALL — Connect Dust](./INSTALL.md#connect-dust) · [Dust: Adding an MCP Server](https://docs.dust.tt/docs/user-documentation/admins/tools-management/adding-an-mcp-server) |
 
-### 1. Configure a dedicated Mode D process
+### 1. Configure a dedicated oauth_user process
 
 ```bash
 export QOBRIX_MCP_TRANSPORT=http
-export QOBRIX_MCP_AUTH=oauth-claude          # or claude / d
+export QOBRIX_MCP_AUTH=oauth_user
 export QOBRIX_MCP_HOST=127.0.0.1
 export QOBRIX_MCP_PORT=3502
 export QOBRIX_MCP_ALLOWED_HOSTS=intranet.sharpsir.group
 export QOBRIX_MCP_PUBLIC_URL=https://intranet.sharpsir.group/qobrix-crm
 export QOBRIX_MCP_RESOURCE_URL=https://intranet.sharpsir.group/qobrix-crm/mcp
 export QOBRIX_OAUTH_ISSUER=https://intranet.sharpsir.group/qobrix-crm/mcp-oauth
-export QOBRIX_OAUTH_INTROSPECTION_SECRET=<same-secret-as-Mode-C-AS>
+export QOBRIX_OAUTH_INTROSPECTION_SECRET=<same-secret-as-the-authorization-server>
 npm start
 ```
 
-Pair with the same Enterprise OAuth AS used for Mode C (`QOBRIX_MCP_RESOURCE_URL` on the AS must match this Mode D resource URL exactly, including `/mcp`).
+Pair with the same Enterprise OAuth AS used for the signed-header path (`QOBRIX_MCP_RESOURCE_URL` on the AS must match this oauth_user resource URL exactly, including `/mcp`).
 
 ### 2. AS redirect allowlist (when enabled)
 
@@ -275,7 +275,7 @@ the HTTPS Cursor callback as well as `cursor://` and `http://localhost`:
 export QOBRIX_OAUTH_REDIRECT_ALLOWLIST=https://claude.ai/api/mcp/auth_callback,http://127.0.0.1,http://localhost,cursor://,https://www.cursor.com/agents/mcp/oauth/callback,https://eu.dust.tt/oauth/mcp/finalize,https://eu.dust.tt/oauth/mcp_static/finalize,https://dust.tt/oauth/mcp/finalize,https://dust.tt/oauth/mcp_static/finalize,https://app.dust.tt/oauth/mcp/finalize,https://app.dust.tt/oauth/mcp_static/finalize
 ```
 
-Empty allowlist = allow all (default; Mode C local pairings keep working).
+Empty allowlist = allow all (default; the signed-header path local pairings keep working).
 
 ### 3. Publish HTTPS `/mcp` + PRM
 
@@ -289,7 +289,7 @@ Empty allowlist = allow all (default; Mode C local pairings keep working).
 
 | Public URL | Role |
 |------------|------|
-| `https://intranet.sharpsir.group/qobrix-crm/mcp` | Mode D MCP resource |
+| `https://intranet.sharpsir.group/qobrix-crm/mcp` | oauth_user MCP resource |
 | `https://intranet.sharpsir.group/qobrix-crm/mcp-oauth` | Paired OAuth AS issuer |
 | `https://intranet.sharpsir.group/.well-known/oauth-protected-resource/qobrix-crm/mcp` | PRM |
 | `https://intranet.sharpsir.group/.well-known/oauth-authorization-server/qobrix-crm/mcp-oauth` | AS metadata |
@@ -324,14 +324,14 @@ curl -si -X POST https://intranet.sharpsir.group/qobrix-crm/mcp \
 curl -s https://intranet.sharpsir.group/.well-known/oauth-protected-resource/qobrix-crm/mcp | jq .
 ```
 
-Mode C’s guidance above (**deny public `/mcp`** for ragchat) remains correct for Mode C processes — do not apply Mode D’s public `/mcp` topology to a Mode C instance.
+the signed-header path’s guidance above (**deny public `/mcp`** for ragchat) remains correct for the signed-header path processes — do not apply oauth_user’s public `/mcp` topology to a the signed-header path instance.
 
 ---
 
 ## Caching & rate limits (optional)
 
 - Caching: [README — Caching](../README.md#caching). Defaults: in-memory LRU; set `QOBRIX_REDIS_URL` for shared Redis. Related: `QOBRIX_CACHE_ENABLED`, `QOBRIX_CACHE_TTL`, `QOBRIX_CACHE_MAX_ENTRIES`, `QOBRIX_REDIS_KEY_PREFIX`.
-- Rate limit: `QOBRIX_MCP_RATE_LIMIT` (default `300` req/min). Mode C also rate-limits `/connect` and `/oauth/callback` (`QOBRIX_MCP_OAUTH_RATE_LIMIT`, default `30`).
+- Rate limit: `QOBRIX_MCP_RATE_LIMIT` (default `300` req/min). the signed-header path also rate-limits `/connect` and `/oauth/callback` (`QOBRIX_MCP_OAUTH_RATE_LIMIT`, default `30`).
 - Output cap: `QOBRIX_MCP_MAX_RESULT_CHARS` (default 30 000). Oversized results compact nested expand/media fields or return `status: "result_too_large"` with `_refine_required` so the agent asks the user to narrow the query. See README “Output cap”. `QOBRIX_MCP_REFINE_MULTIPLIER` (default 8) controls when refine escalates.
 
 ---

@@ -1,14 +1,9 @@
 /**
  * Streamable HTTP transport for qobrix-crm-mcp.
  *
- * Mode B (default for HTTP): per-request X-Api-User / X-Api-Key → ALS.
- * Mode C (QOBRIX_MCP_AUTH=oauth): self-service OAuth client paired with
- *   qobrix-crm-mcp-oauth. /mcp is reachable without a bearer; tools surface
- *   a /connect URL (elicitation -32042 or tool-result text) when the session
- *   vault is empty. After browser login, /oauth/callback stores Qobrix creds.
- * Mode D (QOBRIX_MCP_AUTH=oauth-claude): Claude.ai / Desktop remote connector.
- *   RFC 9728 PRM + 401 WWW-Authenticate + Bearer introspection on /mcp.
- *   Modes A/B/C branches below are intentionally untouched.
+ * api_key: Authorization Bearer user:key, or X-Api-User / X-Api-Key.
+ * oauth_user: RFC 9728 PRM, 401 WWW-Authenticate, Bearer introspection on /mcp.
+ * Signed-header session vaults stay behind QOBRIX_MCP_XCHAT_LEGACY.
  */
 
 import { randomUUID } from "node:crypto";
@@ -24,11 +19,16 @@ import { disableEnvFallback } from "./client.js";
 import { runWithAuthAsync, type AuthCredentials } from "./auth-context.js";
 import {
   resolveAuthMode,
+  acceptedAuthTypes,
   isAutoHttpMode,
   MCP_PATH,
   resolveAuthModeFromRequest,
-} from "./modes.js";
-import type { AuthMode } from "./modes.js";
+  noteXchatRequest,
+  xchatLegacyEnabled,
+  xchatRequestCount,
+  warnDeprecatedAuthEnv,
+} from "./auth-types.js";
+import type { AuthMode } from "./auth-types.js";
 import {
   buildProtectedResourceMetadata,
   createCompanionTokenVerifier,
@@ -59,15 +59,23 @@ function modeCEnabled(autoMode: boolean, authMode: AuthMode): boolean {
 }
 
 function modeDEnabled(autoMode: boolean, authMode: AuthMode): boolean {
-  return autoMode || authMode === "oauth-claude";
+  return autoMode || authMode === "oauth_user";
 }
 
 function readHeaderCreds(req: Request): AuthCredentials | null {
+  const apiUrl = String(req.headers["x-qobrix-api-url"] || "").trim() || undefined;
+  const locale = String(req.headers["x-locale"] || "").trim() || undefined;
+  const auth = String(req.headers.authorization || "");
+  if (auth.toLowerCase().startsWith("bearer ")) {
+    const token = auth.slice("bearer ".length).trim();
+    const split = token.indexOf(":");
+    if (split > 0) {
+      return { apiUser: token.slice(0, split), apiKey: token.slice(split + 1), apiUrl, locale };
+    }
+  }
   const apiUser = String(req.headers["x-api-user"] || "").trim();
   const apiKey = String(req.headers["x-api-key"] || "").trim();
   if (!apiUser || !apiKey) return null;
-  const apiUrl = String(req.headers["x-qobrix-api-url"] || "").trim() || undefined;
-  const locale = String(req.headers["x-locale"] || "").trim() || undefined;
   return { apiUser, apiKey, apiUrl, locale };
 }
 
@@ -96,6 +104,7 @@ function resolveAllowedHosts(bindHost: string): string[] | undefined {
 export async function startHttpServer(): Promise<void> {
   const port = Number(process.env.QOBRIX_MCP_PORT || 3502);
   const host = process.env.QOBRIX_MCP_HOST || "127.0.0.1";
+  warnDeprecatedAuthEnv();
   const authMode = resolveAuthMode("http");
   const autoMode = isAutoHttpMode();
 
@@ -136,12 +145,13 @@ export async function startHttpServer(): Promise<void> {
     res.json({
       ok: true,
       transport: "http",
-      auth: ["api_key", "oauth_user"],
+      auth: acceptedAuthTypes("http"),
       endpoints: { [MCP_PATH]: "http" },
       routing: autoMode
         ? "Authorization Bearer selects oauth_user; an API key selects api_key"
         : undefined,
       description: "Streamable HTTP. Authentication: API key or User OAuth 2.1.",
+      signed_header_requests: xchatRequestCount(),
       connected:
         modeCEnabled(autoMode, authMode)
           ? Boolean(vaultCount && vaultCount > 0)
@@ -150,24 +160,24 @@ export async function startHttpServer(): Promise<void> {
     });
   });
 
-  // Modes B/C/D are strictly per-request (or session vault): never fall back to
+  // api_key, signed-header, and oauth_user are per-request: never fall back to
   // a shared env account inside tool handlers.
   if (
     autoMode ||
     authMode === "oauth" ||
     authMode === "headers" ||
-    authMode === "oauth-claude"
+    authMode === "oauth_user"
   ) {
     disableEnvFallback();
   }
 
-  /** Mode D only — bearer verifier wired after AS metadata fetch. */
+  /** oauth_user only — bearer verifier wired after AS metadata fetch. */
   let modeDVerifier: OAuthTokenVerifier | undefined;
   let modeDResourceUrl: URL | undefined;
 
   if (authMode === "env" && !isLoopbackHost(host)) {
     process.stderr.write(
-      "[qobrix-crm-mcp] WARNING: Mode A over HTTP shares one Qobrix account with every caller and is bound to a non-loopback host. Use QOBRIX_MCP_AUTH=headers or oauth for multi-user access.\n"
+      "[qobrix-crm-mcp] WARNING: none over HTTP shares one Qobrix account with every caller and is bound to a non-loopback host. Use QOBRIX_MCP_AUTH=headers or oauth for multi-user access.\n"
     );
   }
 
@@ -176,7 +186,7 @@ export async function startHttpServer(): Promise<void> {
     requireOAuthEnv();
     if (!isLoopbackHost(host) && !process.env.QOBRIX_MCP_ALLOWED_HOSTS) {
       process.stderr.write(
-        "[qobrix-crm-mcp] WARNING: Mode C leaves /mcp unauthenticated to the MCP client and uses per-user session vaults keyed by identity headers. Bind QOBRIX_MCP_HOST to 127.0.0.1 (or set QOBRIX_MCP_ALLOWED_HOSTS) and configure QOBRIX_MCP_IDENTITY_SECRET so only trusted callers can select a vault.\n"
+        "[qobrix-crm-mcp] WARNING: the signed-header path leaves /mcp unauthenticated to the MCP client and uses per-user session vaults keyed by identity headers. Bind QOBRIX_MCP_HOST to 127.0.0.1 (or set QOBRIX_MCP_ALLOWED_HOSTS) and configure QOBRIX_MCP_IDENTITY_SECRET so only trusted callers can select a vault.\n"
       );
     }
 
@@ -186,7 +196,7 @@ export async function startHttpServer(): Promise<void> {
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       process.stderr.write(
-        `[qobrix-crm-mcp] Mode C DCR deferred (will retry on /connect): ${msg}\n`
+        `[qobrix-crm-mcp] the signed-header path DCR deferred (will retry on /connect): ${msg}\n`
       );
     }
 
@@ -254,7 +264,7 @@ export async function startHttpServer(): Promise<void> {
     });
   }
 
-  // Mode D — Claude.ai / Desktop remote connector (opt-in; does not alter Mode C).
+  // oauth_user — Claude.ai / Desktop remote connector (opt-in; does not alter the signed-header path).
   if (modeDEnabled(autoMode, authMode)) {
     const { issuer, resourceServerUrl, introspectionSecret } = requireOAuthEnv();
     modeDResourceUrl = resourceServerUrl;
@@ -292,7 +302,7 @@ export async function startHttpServer(): Promise<void> {
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       process.stderr.write(
-        `[qobrix-crm-mcp] Mode D AS metadata deferred (will fail Bearer until AS is up): ${msg}\n`
+        `[qobrix-crm-mcp] oauth_user AS metadata deferred (will fail Bearer until AS is up): ${msg}\n`
       );
       // Still construct verifier with /introspect default so late AS comes online.
       modeDVerifier = createCompanionTokenVerifier({
@@ -305,7 +315,7 @@ export async function startHttpServer(): Promise<void> {
 
     if (!isLoopbackHost(host) && !process.env.QOBRIX_MCP_ALLOWED_HOSTS) {
       process.stderr.write(
-        "[qobrix-crm-mcp] Mode D: publish HTTPS /mcp + PRM for Claude.ai custom connectors. Set QOBRIX_MCP_ALLOWED_HOSTS to your public hostname(s). Allowlist Anthropic egress 160.79.104.0/21 if WAF'd.\n"
+        "[qobrix-crm-mcp] oauth_user: publish HTTPS /mcp + PRM for Claude.ai custom connectors. Set QOBRIX_MCP_ALLOWED_HOSTS to your public hostname(s). Allowlist Anthropic egress 160.79.104.0/21 if WAF'd.\n"
       );
     }
   }
@@ -372,14 +382,14 @@ export async function startHttpServer(): Promise<void> {
       );
     };
 
-    // Mode D — Claude remote connector: require Bearer; never fall into Mode C.
-    if (routeAuthMode === "oauth-claude") {
+    // oauth_user — Claude remote connector: require Bearer; never fall into the signed-header path.
+    if (routeAuthMode === "oauth_user") {
       const resourceUrl = modeDResourceUrl;
       const verifier = modeDVerifier;
       if (!resourceUrl || !verifier) {
         res.status(503).json({
           error: "temporarily_unavailable",
-          error_description: "Mode D OAuth Resource Server is not ready",
+          error_description: "oauth_user OAuth Resource Server is not ready",
         });
         return;
       }
@@ -393,7 +403,7 @@ export async function startHttpServer(): Promise<void> {
         res.status(401).json({
           error: "unauthorized",
           error_description:
-            "Mode D requires Authorization: Bearer <access_token> (Claude.ai custom connector OAuth)",
+            "oauth_user requires Authorization: Bearer <access_token> (Claude.ai custom connector OAuth)",
         });
         return;
       }
@@ -414,7 +424,7 @@ export async function startHttpServer(): Promise<void> {
       try {
         const authInfo = await verifier.verifyAccessToken(token);
         const scopes = authInfo.scopes || [];
-        if (scopes.length && !scopes.includes("qobrix:read")) {
+        if (!scopes.includes("qobrix:read")) {
           res.setHeader("WWW-Authenticate", `${wwwAuthenticateChallenge(resourceUrl)}, error="insufficient_scope"`);
           res.status(403).json({ error: "insufficient_scope", error_description: "qobrix:read is required" });
           return;
@@ -448,6 +458,14 @@ export async function startHttpServer(): Promise<void> {
     }
 
     if (routeAuthMode === "oauth") {
+      if (!xchatLegacyEnabled()) {
+        res.status(401).json({
+          error: "unauthorized",
+          error_description: "Signed-header authentication is disabled.",
+        });
+        return;
+      }
+      noteXchatRequest();
       const { vaultKey, reason } = resolveVaultKeyFromHeaders({
         platform: String(req.headers["x-chat-platform"] || ""),
         userId: String(req.headers["x-chat-user-id"] || ""),
@@ -468,7 +486,7 @@ export async function startHttpServer(): Promise<void> {
         );
       }
 
-      // Self-service Mode C: no bearer required. Use vault creds when present.
+      // Self-service the signed-header path: no bearer required. Use vault creds when present.
       let creds = await refreshIfNeeded(vaultKey);
       if (!creds) creds = getSessionCredentials(vaultKey);
       if (creds) {
@@ -486,7 +504,7 @@ export async function startHttpServer(): Promise<void> {
         res.status(401).json({
           error: "unauthorized",
           error_description:
-            "Mode B requires X-Api-User and X-Api-Key request headers",
+            "api_key requires Authorization: Bearer <user>:<key> or X-Api-User and X-Api-Key",
         });
         return;
       }
@@ -494,7 +512,7 @@ export async function startHttpServer(): Promise<void> {
       return;
     }
 
-    // Mode A over HTTP: shared env credentials (rare; useful for smoke tests).
+    // none over HTTP: shared env credentials (rare; useful for smoke tests).
     await run();
   };
 
@@ -540,13 +558,13 @@ export async function startHttpServer(): Promise<void> {
         try {
           const { resourceServerUrl, issuer } = requireOAuthEnv();
           process.stderr.write(
-            `[qobrix-crm-mcp] Mode D resource: ${resourceServerUrl.href}\n`
+            `[qobrix-crm-mcp] oauth_user resource: ${resourceServerUrl.href}\n`
           );
           process.stderr.write(
-            `[qobrix-crm-mcp] Mode D AS issuer: ${issuer.href.replace(/\/+$/, "")}\n`
+            `[qobrix-crm-mcp] oauth_user AS issuer: ${issuer.href.replace(/\/+$/, "")}\n`
           );
           process.stderr.write(
-            `[qobrix-crm-mcp] Mode D PRM: ${resourceServerUrl.origin}/.well-known/oauth-protected-resource\n`
+            `[qobrix-crm-mcp] oauth_user PRM: ${resourceServerUrl.origin}/.well-known/oauth-protected-resource\n`
           );
         } catch {
           /* already validated above */

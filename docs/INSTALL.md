@@ -1,6 +1,6 @@
 # Install Qobrix CRM MCP for Claude
 
-This guide deploys the MCP Resource Server in Mode D at:
+This guide deploys the MCP Resource Server in oauth_user at:
 
 - MCP: `https://intranet.sharpsir.group/qobrix-crm/mcp`
 - OAuth issuer: `https://intranet.sharpsir.group/qobrix-crm/mcp-oauth`
@@ -26,7 +26,7 @@ npm run build
 
 The build copies the Sharp SIR logo into `dist/assets/`.
 
-## Configure Mode D
+## Configure oauth_user
 
 Generate secrets once:
 
@@ -39,7 +39,7 @@ Create `.env` (never commit it):
 
 ```dotenv
 QOBRIX_MCP_TRANSPORT=http
-QOBRIX_MCP_AUTH=oauth-claude
+QOBRIX_MCP_AUTH=oauth_user
 QOBRIX_MCP_HOST=127.0.0.1
 QOBRIX_MCP_PORT=3502
 QOBRIX_MCP_ALLOWED_HOSTS=intranet.sharpsir.group
@@ -95,7 +95,7 @@ ProxyPassReverse /.well-known/oauth-authorization-server http://127.0.0.1:3503/.
 ProxyPass /qobrix-crm/mcp-oauth/ http://127.0.0.1:3503/
 ProxyPassReverse /qobrix-crm/mcp-oauth/ http://127.0.0.1:3503/
 
-# Qobrix MCP resource (Mode D). Listed after mcp-oauth so the longer AS
+# Qobrix MCP resource (oauth_user). Listed after mcp-oauth so the longer AS
 # prefix wins; /qobrix-crm/mcp is only reached for the MCP path.
 ProxyPass /.well-known/oauth-protected-resource/qobrix-crm/mcp http://127.0.0.1:3502/.well-known/oauth-protected-resource/qobrix-crm/mcp
 ProxyPassReverse /.well-known/oauth-protected-resource/qobrix-crm/mcp http://127.0.0.1:3502/.well-known/oauth-protected-resource/qobrix-crm/mcp
@@ -108,10 +108,10 @@ ProxyPassReverse /qobrix-crm/mcp http://127.0.0.1:3502/mcp
 </Location>
 ```
 
-### Mode C on path mounts (e.g. humaticai.com)
+### the signed-header path on path mounts (e.g. humaticai.com)
 
-Planet 9 / ragchat Mode C uses separate public prefixes (`QOBRIX_MCP_PUBLIC_URL` /
-`QOBRIX_OAUTH_ISSUER`), not the Mode D `/qobrix-crm/mcp` paths above. Example:
+Planet 9 / ragchat the signed-header path uses separate public prefixes (`QOBRIX_MCP_PUBLIC_URL` /
+`QOBRIX_OAUTH_ISSUER`), not the oauth_user `/qobrix-crm/mcp` paths above. Example:
 
 ```apache
 # Browser-only MCP routes (deny /mcp + /health — agents use 127.0.0.1:3502)
@@ -146,7 +146,7 @@ discovers at bare `/.well-known/oauth-authorization-server` will parse marketing
 SPA HTML and fail Sign In.
 
 **Cookie Path trap:** never put `ProxyPassReverseCookiePath / /something` at
-vhost scope — Apache treats `/` as a prefix of every path, so Mode C’s
+vhost scope — Apache treats `/` as a prefix of every path, so the signed-header path’s
 `Path=/qobrix-mcp` connect cookie becomes `Path=/something` and the OAuth
 callback fails with “Connect cookie / state mismatch”. Scope that directive
 inside `<Location /eldes>` (or the app that needs it).
@@ -199,7 +199,7 @@ If a WAF restricts source networks, allow Anthropic egress
 
 ## Connect Cursor
 
-Cursor and Claude share the **same** Mode D MCP URL and Authorization Server.
+Cursor and Claude share the **same** oauth_user MCP URL and Authorization Server.
 Cursor’s Dynamic Client Registration sends **all three** redirect URIs; the AS
 allowlist must prefix-match every one:
 
@@ -226,7 +226,7 @@ that to HTTP 500, which Cursor shows as **Internal Server Error**.
 
 ## Connect Dust
 
-Dust and Claude share the **same** Mode D MCP URL and Authorization Server.
+Dust and Claude share the **same** oauth_user MCP URL and Authorization Server.
 On the AS, keep Claude’s redirect prefix, Cursor’s HTTPS callback, and **append**
 Dust finalize prefixes to `QOBRIX_OAUTH_REDIRECT_ALLOWLIST` (do not replace
 Claude’s entry):
@@ -284,5 +284,5 @@ Anthropic `160.79.104.0/21` — do not remove Claude’s allowlist.
 
 ## Other authentication modes
 
-Modes A, B, and C remain supported. See [USER_GUIDE.md](./USER_GUIDE.md) for
+`none`, `api_key`, and the signed-header path remain supported. See [USER_GUIDE.md](./USER_GUIDE.md) for
 stdio shared credentials, trusted HTTP headers, and elicitation-based OAuth.
