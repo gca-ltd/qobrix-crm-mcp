@@ -9,6 +9,10 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 
 ## [Unreleased]
 
+### Fixed
+
+- The connected and error pages use the shared Matrix sign-in card (light canvas, Sharp SIR logo, navy button), the same card as the intranet sign-in page.
+
 ### Added
 
 - `QOBRIX_MCP_AUTH` is a comma list of `none`, `api_key`, and `oauth_user`. HTTP defaults to `api_key,oauth_user` and selects the type from the request. Older single values still work for one minor release and warn once at boot.
