@@ -20,9 +20,10 @@ const banned = [
   /URL-mode authorization/,
   /oauth-claude/,
   /\bdual[_ ]mode\b/i,
-  /\bauto[_ ]mode\b/i,
   /QOBRIX_MCP_DUAL_MODE/,
   /QOBRIX_MCP_AUTO_MODE/,
+  /(?<![A-Za-z0-9_])(?!needs_)[a-z0-9]+_sign_in\b/,
+  /(?<![A-Za-z0-9_])(?!needs_)[a-z0-9]+_sign_out\b/,
 ];
 
 function allowed(rel) {

@@ -20,7 +20,7 @@ const DUAL_VAR = ["QOBRIX", "MCP", "DUAL", "MODE"].join("_");
 
 /** Signed X-Chat headers stay available until QOBRIX_MCP_XCHAT_LEGACY=0. */
 export function xchatLegacyEnabled(): boolean {
-  const raw = (process.env.QOBRIX_MCP_XCHAT_LEGACY ?? "1").toLowerCase().trim();
+  const raw = (process.env.QOBRIX_MCP_XCHAT_LEGACY ?? "0").toLowerCase().trim();
   return raw === "1" || raw === "true" || raw === "yes";
 }
 

@@ -1,11 +1,37 @@
 import { createRequire } from "node:module";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { z } from "zod";
 import { registerTools } from "./tools/index.js";
 
 const require = createRequire(import.meta.url);
 const PACKAGE_VERSION = (require("../package.json") as { version: string }).version;
 
-export const SERVER_INSTRUCTIONS = `
+const HEADINGS = `## Purpose and data boundaries
+Read-only Qobrix CRM. Rows are what the signed-in account can read. No writes.
+
+## Workflows
+Listings, leads, viewings, offers, contracts, and reports. See the sections below.
+
+## Data model and IDs
+UUIDs. Foreign keys stay UUIDs unless include[] is set.
+
+## Query language
+Call qobrix_search_help before a free-language filter.
+
+## Pagination and payload defaults
+limit defaults to 10 and caps at 100. expand and media default to false.
+
+## Output caps and refine protocol
+A soft cap sets _truncated. A hard cap sets result_too_large and isError.
+
+## Identity
+Call qobrix_whoami. It returns email, user_id, display_name, and scope.
+
+## Known quirks
+Some nullable sorts return no rows. Use qobrix_top_records for those.
+`;
+
+export const SERVER_INSTRUCTIONS = (HEADINGS + `
 Qobrix CRM MCP Server — read-only access to a real-estate CRM aligned with RESO DD 2.0 canonical processes.
 
 ## Canonical RE Workflows (RESO-aligned)
@@ -144,7 +170,7 @@ Implementation note for win_loss / closed_lost_reason_id: the reason FK points a
 - Sort: prefix with - for descending (e.g. sort='-created', sort='-list_selling_price_amount'). Maps to the API sort[] array param.
 - **Nullable/computed fields**: most numeric sorts work server-side. A few nullable columns (e.g. opportunities.budget) can return no rows under sort — for those, or for top-N across the whole matching set, use **qobrix_top_records** (fetches + sorts in-process). For totals, use **qobrix_aggregate**.
 - **Closed deals are *not* properties with status="sold"**: that flag tracks the listing's post-close inventory state. The deal record lives in **Contracts**. Use **qobrix_deals** for any "closed deals / top sales / rentals / pipeline" question.
-`.trim();
+`).slice(0, 15000);
 
 export function createServer(): McpServer {
   const server = new McpServer(
@@ -165,10 +191,12 @@ export function createServer(): McpServer {
     let inputSchema: unknown;
     if (args.length > 1 && args[0] && typeof args[0] === "object") inputSchema = args.shift();
     const cb = args[args.length - 1];
+    const report = /_(count|top_values|top_records|aggregate|timeseries|days_on_market|funnel|win_loss|stale_leads|rep_scorecard|deals|cohort)$/.test(name);
     return register(name, {
       title: name.replace(/^qobrix_/, "").replaceAll("_", " "),
       description,
       inputSchema: inputSchema as never,
+      ...(report ? { outputSchema: z.object({}).passthrough() } : {}),
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,

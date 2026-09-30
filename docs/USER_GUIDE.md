@@ -183,7 +183,7 @@ host forwards (`X-Chat-Platform` / `X-Chat-User-Id`, optionally signed with
 native individual id — signing in as Alice never overwrites Bob's vault.
 Deliver the Sign In link **only to that individual** (never into a group thread).
 
-1. Agent calls a CRM tool with no session for this user (or calls **`qobrix_sign_in`** / **`qobrix_whoami`**).
+1. Agent calls a CRM tool with no session for this user (or calls **`qobrix_whoami`**).
 2. MCP returns either:
    - **URL-mode elicitation** (`JSON-RPC -32042`) when the client supports `elicitation.url`, or
    - A Markdown **`[Sign In to Qobrix]({PUBLIC_URL}/connect?e=…)`** link (ragchat / LangChain fallback). The LLM must show that exact link (unique / single-use — never reuse a link from an earlier message).
@@ -191,7 +191,7 @@ Deliver the Sign In link **only to that individual** (never into a group thread)
 4. AS redirects to `{PUBLIC_URL}/oauth/callback` → PKCE exchange + introspection → encrypted session vault (`session.enc`). The browser shows a **Connected** (or error) page in the same Sharp Matrix card shell as the login form, with a **Close** button — close the window and return to the chat to continue.
 5. User retries — tools run with that user’s minted Qobrix API key.
 6. **`qobrix_whoami`** returns the current profile (`user` + `capabilities` + `portals`, plus OAuth `subject` when available).
-7. **`qobrix_sign_out`** fully revokes: AS `/disconnect` (Bearer) deletes the minted Qobrix API key and clears the AS vault/tokens, then the local vault is wiped. the signed-header path uses one shared vault — sign-out disconnects the shared identity for this MCP process.
+7. Revoke is the authorization server `/disconnect`. There is no sign-out tool.
 
 ### 3. Endpoints
 

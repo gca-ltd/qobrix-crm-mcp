@@ -7,6 +7,7 @@
  */
 
 import { randomUUID } from "node:crypto";
+import { readFileSync } from "node:fs";
 import type { Request, Response } from "express";
 import rateLimit from "express-rate-limit";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
@@ -55,6 +56,7 @@ import {
 import { errorHtml, langFromHeader, successHtml } from "./auth-pages.js";
 
 function modeCEnabled(autoMode: boolean, authMode: AuthMode): boolean {
+  if (!xchatLegacyEnabled()) return false;
   return autoMode || authMode === "oauth";
 }
 
@@ -138,25 +140,19 @@ export async function startHttpServer(): Promise<void> {
     })
   );
 
-  app.get("/health", (_req, res) => {
-    const vaultCount = modeCEnabled(autoMode, authMode)
-      ? countSessionVaults()
-      : undefined;
+  app.get(["/health", "/mcp/health"], (_req, res) => {
     res.json({
       ok: true,
-      transport: "http",
-      auth: acceptedAuthTypes("http"),
-      endpoints: { [MCP_PATH]: "http" },
-      routing: autoMode
-        ? "Authorization Bearer selects oauth_user; an API key selects api_key"
-        : undefined,
-      description: "Streamable HTTP. Authentication: API key or User OAuth 2.1.",
-      signed_header_requests: xchatRequestCount(),
-      connected:
-        modeCEnabled(autoMode, authMode)
-          ? Boolean(vaultCount && vaultCount > 0)
-          : undefined,
-      session_vaults: vaultCount,
+      name: "qobrix",
+      version: readFileSync(new URL("../package.json", import.meta.url), "utf8").match(/"version": "([^"]+)"/)?.[1] || "0.0.0",
+      protocolVersions: ["2025-11-25", "2025-06-18"],
+      auth: {
+        resource: process.env.QOBRIX_MCP_RESOURCE_URL || process.env.QOBRIX_MCP_PUBLIC_URL || "",
+        issuer: process.env.QOBRIX_OAUTH_ISSUER || process.env.QOBRIX_MCP_ISSUER || "",
+        scopes: ["qobrix:read"],
+      },
+      contractVersion: null,
+      drift: null,
     });
   });
 

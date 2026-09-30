@@ -168,13 +168,10 @@ export function formatResult(data: unknown) {
   const fullText = JSON.stringify(data, null, 2);
 
   if (max === 0 || fullText.length <= max) {
+    const structured = data && typeof data === "object" && !Array.isArray(data) ? data as Record<string, unknown> : { items: data, count: Array.isArray(data) ? data.length : 1 };
     return {
-      content: [
-        {
-          type: "text" as const,
-          text: fullText,
-        },
-      ],
+      content: [{ type: "text" as const, text: fullText }],
+      structuredContent: structured,
     };
   }
 
@@ -272,7 +269,7 @@ export function formatResult(data: unknown) {
             text,
           },
         ],
-        isError: false as const,
+        isError: true as const,
       };
     }
 
@@ -321,7 +318,7 @@ export function formatResult(data: unknown) {
           text,
         },
       ],
-      isError: false as const,
+      isError: true as const,
     };
   }
 
@@ -353,60 +350,17 @@ export function errorResult(error: unknown) {
   }
 
   if (error instanceof AuthRequiredError) {
-    if (clientSupportsUrlElicitation()) {
-      const mcp = getRequestMcpServer();
-      if (mcp) {
-        try {
-          const notifier = mcp.server.createElicitationCompletionNotifier(
-            error.elicitationId
-          );
-          registerElicitationNotifier(error.elicitationId, notifier);
-        } catch {
-          // Client may not support the notification path; URL still works.
-        }
-      }
-      throw new UrlElicitationRequiredError(
-        [
-          {
-            mode: "url",
-            elicitationId: error.elicitationId,
-            url: error.connectUrl,
-            message:
-              "Qobrix authorization is required. Open the link to sign in with your Qobrix account.",
-          },
-        ],
-        "Qobrix authorization required"
-      );
-    }
-
-    // Fallback for clients without elicitation (ragchat / LangChain): Markdown
-    // link the LLM relays verbatim. isError:false so the model does not treat
-    // it as a hard failure to retry blindly.
     return {
-      content: [
-        {
-          type: "text" as const,
-          text:
-            "Qobrix authorization is required before this tool can run.\n\n" +
-            "Show the user this exact Markdown link (do not alter the URL) so they can sign in (login + 2FA + consent):\n\n" +
-            `[Sign In to Qobrix](${error.connectUrl})\n\n` +
-            "This link is unique and single-use — always present the link from THIS tool result; never reuse or repeat a link from an earlier message.\n\n" +
-            "After they complete sign-in, retry the same request — the MCP will use their Qobrix credentials.",
-        },
-      ],
-      isError: false as const,
+      content: [{ type: "text" as const, text: "Sign-in is required." }],
+      structuredContent: { error: "Sign-in is required.", next_step: "Sign in again from the client. This server does not return a link." },
+      isError: true as const,
     };
   }
 
-  const message =
-    error instanceof Error ? error.message : "An unknown error occurred";
+  const message = error instanceof Error ? error.message : "An unknown error occurred";
   return {
-    content: [
-      {
-        type: "text" as const,
-        text: `Error: ${message}`,
-      },
-    ],
+    content: [{ type: "text" as const, text: `Error: ${message}` }],
+    structuredContent: { error: message, next_step: "Read the error, change the arguments, and call the tool again." },
     isError: true as const,
   };
 }

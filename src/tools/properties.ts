@@ -20,16 +20,9 @@ export function registerPropertyTools(server: McpServer): void {
     "Key fields (184 total): name, ref, status, sale_rent (for_sale/for_rent), property_type, " +
     "property_subtype, city, country, list_selling_price_amount, list_rental_price_amount, " +
     "bedrooms, bathrooms, covered_area_amount, plot_area_amount, " +
-    "agent (UUID → qobrix_get_agent), seller (UUID → qobrix_get_contact), " +
-    "project (UUID → qobrix_get_project), salesperson (UUID → user). " +
-    "Workflow recipes: " +
-    "Active inventory → search: status == \"available\" and sale_rent == \"for_sale\". " +
-    "Recent listings → sort: '-created'. " +
-    "Buyer-property match → prefer qobrix_search_properties with search + boost for free-language demand. " +
-    "Listing media → follow up with qobrix_list_media(related_model='Properties'). " +
-    "PAYLOAD DEFAULTS: expand=false and media=false — FKs come back as UUIDs and media is not inlined " +
-    "(set expand=true / media=true explicitly when full nested objects or media URLs are needed). " +
-    "Prefer include[] for surgical expansion of specific associations. Default limit 10, max 100.",
+    "agent, seller, project, and salesperson are UUIDs. " +
+    "Use qobrix_search_properties when the buyer describes what they want. " +
+    "expand and media default to false. Default limit 10, max 100. Related: qobrix_search_help.",
     ListPropertiesSchema.shape,
     async ({ limit, page, sort, fields, include, media, expand, search }) => {
       try {
@@ -80,16 +73,10 @@ export function registerPropertyTools(server: McpServer): void {
     "With boost: returns top-N with `_relevance` (score) and `_matched` (which boosts hit); " +
     "pagination.mode='ranked' and pagination.scanned shows pool size. " +
     "Without boost: fast path — single cached list page (pagination.mode='fast'). " +
-    "Call qobrix_search_dsl_help({resource:'Properties'}) before composing queries. " +
-    "Examples: " +
-    "Hard only: search='status == \"available\" and sale_rent == \"for_sale\" and city contains \"Limassol\"'. " +
-    "Demand match: search='status == \"available\" and sale_rent == \"for_sale\"', " +
-    "boost=[{field:'sea_view',op:'==',value:true,weight:3},{field:'bedrooms',op:'>=',value:3,weight:2}," +
-    "{field:'list_selling_price_amount',op:'in',value:'200000..600000',weight:2}], limit=15, max_scan=200. " +
-    "PAYLOAD: keep expand=false / media=false for search; when either is true, max_scan is auto-capped at 100. " +
-    "If a result returns status='result_too_large' with _refine_required, ask the user to narrow the query " +
-    "(filters, fields[], smaller limit, drop expand/media) then retry. " +
-    "All upstream pages are response-cached (QOBRIX_CACHE_TTL, default 300s).",
+    "Call qobrix_search_help before composing a query. " +
+    "Example: search='status == \"available\" and sale_rent == \"for_sale\"'. " +
+    "Keep expand and media false. A result_too_large status means narrow the query and retry. " +
+    "Related: qobrix_list_properties.",
     SearchPropertiesSchema.shape,
     async ({ search, boost, max_scan, limit, page, sort, fields, media, expand }) => {
       try {
@@ -114,9 +101,12 @@ export function registerPropertyTools(server: McpServer): void {
 
   server.tool(
     "qobrix_get_property_coordinates",
-    "Get lat/lng coordinates for properties, useful for map display. " +
-    "Optionally filter with a search expression to get coordinates for a subset. " +
-    "Returns array of { id, coordinates } objects.",
+    "Get lat/lng coordinates for properties, for a map. " +
+    "Use when the user wants pins rather than listing cards. " +
+    "Returns an array of { id, coordinates }. " +
+    "Notes: pass search to limit the set, using the same DSL as qobrix_search_properties. " +
+    "Examples: search='status == \"available\" and city contains \"Limassol\"'. " +
+    "Related: qobrix_list_properties, qobrix_search_help.",
     GetPropertyCoordinatesSchema.shape,
     async ({ search }) => {
       try {

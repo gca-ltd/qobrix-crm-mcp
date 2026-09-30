@@ -77,6 +77,8 @@ const CSS = `
       font-size: 0.95rem; line-height: 1.45;
     }
     .body p { margin: 0; color: var(--foreground); }
+    .body p.message { text-align: center; }
+    [hidden] { display: none !important; }
     .hint { margin: 0; color: var(--muted-foreground); font-size: 0.875rem; line-height: 1.45; }
     .alert {
       display: flex; gap: 0.5rem; align-items: flex-start;
@@ -108,6 +110,25 @@ const CSS = `
       text-align: center;
     }
     .footer p { margin: 0; font-size: 0.7rem; color: var(--muted-foreground); }
+    .notice {
+      background: var(--muted);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 0.75rem 0.9rem;
+      text-align: center;
+      font-size: 0.875rem;
+      line-height: 1.45;
+    }
+    .notice p { margin: 0; }
+    .notice .notice-return { color: var(--muted-foreground); margin-top: 0.35rem; }
+    .notice .notice-warn {
+      margin-top: 0.5rem;
+      color: hsl(32 80% 30%);
+      background: hsl(43 90% 95%);
+      border: 1px solid hsl(43 70% 80%);
+      border-radius: var(--radius);
+      padding: 0.45rem 0.6rem;
+    }
 `;
 
 function escapeAttr(value) {
@@ -117,8 +138,36 @@ function escapeAttr(value) {
 }
 
 /**
- * @param {{ lang?: string, title: string, body: string, actions?: Array<{ label: string, url: string, method?: string, variant?: "primary" | "outline" }> }} opts
+ * One centred consent block. The shell owns the markup and the CSS.
+ * `clientLine` is the `{{client}}` / `{{server}}` template. Names are escaped here.
+ * @param {{ clientLine: string, clientName: string, server?: string, returnLine?: string, warning?: string }} opts
+ */
+export function consentNoticeHtml(opts) {
+  const client = escapeAttr(opts.clientName || "");
+  const server = escapeAttr(opts.server || "");
+  const line = escapeAttr(opts.clientLine || "")
+    .replace(/\{\{client\}\}/g, `<strong>${client}</strong>`)
+    .replace(/\{\{server\}\}/g, server);
+  const back = opts.returnLine ? `<p class="notice-return">${escapeAttr(opts.returnLine)}</p>` : "";
+  const warning = opts.warning ? `<p class="notice-warn">${escapeAttr(opts.warning)}</p>` : "";
+  return `<div class="notice"><p>${line}</p>${back}${warning}</div>`;
+}
+
+/**
+ * Browsers only let a script close a tab that a script opened, so a refused
+ * close swaps the button for the `blocked` line.
+ */
+function closeButtonHtml(close) {
+  return `<button class="btn btn-outline" type="button" data-close-window>${escapeAttr(close.label)}</button>`
+    + `<p class="message hint" data-close-blocked hidden>${escapeAttr(close.blocked)}</p>`
+    + `<script>(function(){var b=document.querySelector("[data-close-window]");if(!b)return;b.addEventListener("click",function(){window.close();setTimeout(function(){if(window.closed)return;b.hidden=true;var m=document.querySelector("[data-close-blocked]");if(m)m.hidden=false;},300);});})();</script>`;
+}
+
+/**
+ * @param {{ lang?: string, title: string, body: string, year?: number, actions?: Array<{ label: string, url: string, method?: string, variant?: "primary" | "outline" }>, close?: { label: string, blocked: string } }} opts
  * `body` is HTML the caller has already escaped. `actions` become Allow/Deny forms.
+ * `close` adds a close-tab button (result pages only).
+ * Pass `year` when the HTML is committed; the browser can replace `[data-year]`.
  */
 export function renderAuthPage(opts) {
   const lang = opts.lang || "en";
@@ -126,8 +175,8 @@ export function renderAuthPage(opts) {
     const variant = action.variant === "outline" ? "btn-outline" : "btn-primary";
     const method = (action.method || "post").toLowerCase() === "get" ? "get" : "post";
     return `<form method="${method}" action="${escapeAttr(action.url)}"><button class="btn ${variant}" type="submit">${escapeAttr(action.label)}</button></form>`;
-  }).join("");
-  const year = new Date().getFullYear();
+  }).join("") + (opts.close ? closeButtonHtml(opts.close) : "");
+  const year = opts.year || new Date().getFullYear();
   return `<!DOCTYPE html>
 <html lang="${escapeAttr(lang)}">
 <head>
@@ -153,7 +202,7 @@ export function renderAuthPage(opts) {
         ${opts.body || ""}
         ${actions ? `<div class="actions">${actions}</div>` : ""}
       </div>
-      <div class="footer"><p>© ${year} Sharp Sotheby's International Realty</p></div>
+      <div class="footer"><p>© <span data-year>${year}</span> Sharp Sotheby's International Realty</p></div>
     </main>
   </div>
 </body>

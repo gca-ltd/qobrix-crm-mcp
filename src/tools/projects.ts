@@ -91,8 +91,12 @@ export function registerProjectTools(server: McpServer): void {
 
   server.tool(
     "qobrix_get_project_coordinates",
-    "Get lat/lng coordinates for projects, useful for map display. " +
-    "Optionally filter with a search expression.",
+    "Get lat/lng coordinates for projects, for a map. " +
+    "Use when the user wants development pins rather than project cards. " +
+    "Returns an array of { id, coordinates }. " +
+    "Notes: pass search to limit the set. " +
+    "Examples: search='city contains \"Limassol\"'. " +
+    "Related: qobrix_list_projects, qobrix_search_help.",
     GetProjectCoordinatesSchema.shape,
     async ({ search }) => {
       try {

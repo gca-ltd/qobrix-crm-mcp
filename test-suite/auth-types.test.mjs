@@ -277,7 +277,7 @@ describe("modes + open-core pairing", () => {
       const badHtml = await badConnect.text();
       assert.match(badHtml, /Unknown or expired|expired|failed/i);
 
-      // Cold tool call (no session) → auth URL in tool result text (no elicitation)
+      // Cold tool call (no session) is an error with next_step, not a link.
       const init2 = await mcpInitialize(resource);
       const sessionId = init2.headers.get("mcp-session-id");
       const toolRes = await mcpCallTool(
@@ -288,76 +288,9 @@ describe("modes + open-core pairing", () => {
       );
       assert.ok(toolRes.status === 200 || toolRes.status === 202);
       const rpc = await readJsonRpc(toolRes);
-
-      // Either CallToolResult with connect URL text, or -32042 if somehow elicitation
-      if (rpc.error) {
-        assert.equal(rpc.error.code, -32042);
-        const url =
-          rpc.error.data?.elicitations?.[0]?.url ||
-          JSON.stringify(rpc.error.data);
-        assert.match(String(url), /\/connect\?e=/);
-      } else {
-        const text = JSON.stringify(rpc.result || rpc);
-        assert.match(text, /\/connect\?e=/);
-        assert.match(text, /\[Sign In to Qobrix\]\(/);
-        assert.match(text, /authorization|sign in|Qobrix/i);
-        assert.match(text, /unique and single-use|never reuse/i);
-      }
-
-      // Session tools: sign_in / whoami (cold) surface connect link; sign_out with no session
-      const signInRes = await mcpCallTool(
-        resource,
-        sessionId,
-        "qobrix_sign_in",
-        {}
-      );
-      const signInRpc = await readJsonRpc(signInRes);
-      if (signInRpc.error) {
-        assert.equal(signInRpc.error.code, -32042);
-        assert.match(
-          String(
-            signInRpc.error.data?.elicitations?.[0]?.url ||
-              JSON.stringify(signInRpc.error.data)
-          ),
-          /\/connect\?e=/
-        );
-      } else {
-        const t = JSON.stringify(signInRpc.result || signInRpc);
-        assert.match(t, /\/connect\?e=/);
-        assert.match(t, /\[Sign In to Qobrix\]\(/);
-      }
-
-      const whoamiRes = await mcpCallTool(
-        resource,
-        sessionId,
-        "qobrix_whoami",
-        {}
-      );
-      const whoamiRpc = await readJsonRpc(whoamiRes);
-      if (whoamiRpc.error) {
-        assert.equal(whoamiRpc.error.code, -32042);
-        assert.match(
-          String(
-            whoamiRpc.error.data?.elicitations?.[0]?.url ||
-              JSON.stringify(whoamiRpc.error.data)
-          ),
-          /\/connect\?e=/
-        );
-      } else {
-        const t = JSON.stringify(whoamiRpc.result || whoamiRpc);
-        assert.match(t, /\/connect\?e=/);
-      }
-
-      const signOutRes = await mcpCallTool(
-        resource,
-        sessionId,
-        "qobrix_sign_out",
-        {}
-      );
-      const signOutRpc = await readJsonRpc(signOutRes);
-      assert.ok(!signOutRpc.error, "sign_out should not error when disconnected");
-      const signOutText = JSON.stringify(signOutRpc.result || signOutRpc);
-      assert.match(signOutText, /No active Qobrix session/i);
+      const text = JSON.stringify(rpc.result || rpc.error || rpc);
+      assert.match(text, /next_step|Sign-in is required/i);
+      assert.doesNotMatch(text, /\[Sign In to Qobrix\]\(/);
 
       // Fingerprint helper sanity (api_key/C cache scoping)
       const fp = createHash("sha256").update("u|k").digest("hex").slice(0, 16);

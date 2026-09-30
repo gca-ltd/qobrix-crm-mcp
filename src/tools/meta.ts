@@ -80,8 +80,8 @@ export function registerMetaTools(server: McpServer): void {
     }
   );
 
-  server.tool(
-    "qobrix_search_dsl_help",
+  for (const toolName of ["qobrix_search_dsl_help", "qobrix_search_help"]) server.tool(
+    toolName,
     "Return the full Qobrix Search Expression DSL reference so you can build correct `search` strings " +
     "and `boost[]` clauses for ANY qobrix_search_* tool (properties, projects, contacts, agents, " +
     "opportunities, viewings, tasks, offers, contracts). " +

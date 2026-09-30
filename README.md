@@ -108,7 +108,7 @@ The server is organized around six RESO-aligned business processes. The LLM rece
 
 ### Tools at a Glance
 
-**64** tools — CRM entities, schema discovery, **analytics** (`qobrix_count`, `qobrix_top_values`, `qobrix_top_records`, `qobrix_aggregate`), a flexible **deals** shortcut (`qobrix_deals`), **reporting** (`qobrix_timeseries`, `qobrix_funnel`, `qobrix_rep_scorecard`, `qobrix_stale_leads`, `qobrix_win_loss`, `qobrix_days_on_market`), **customer** intelligence (`qobrix_cohort`), **audit** / change history (`qobrix_get_changes`, `qobrix_search_changes`, `qobrix_field_change_history`, `qobrix_top_field_changers`), **cache** helpers (`qobrix_cache_stats`, `qobrix_cache_clear`), and **session & identity** (`qobrix_sign_in`, `qobrix_sign_out`, `qobrix_whoami`):
+**64** tools — CRM entities, schema discovery, **analytics** (`qobrix_count`, `qobrix_top_values`, `qobrix_top_records`, `qobrix_aggregate`), a flexible **deals** shortcut (`qobrix_deals`), **reporting** (`qobrix_timeseries`, `qobrix_funnel`, `qobrix_rep_scorecard`, `qobrix_stale_leads`, `qobrix_win_loss`, `qobrix_days_on_market`), **customer** intelligence (`qobrix_cohort`), **audit** / change history (`qobrix_get_changes`, `qobrix_search_changes`, `qobrix_field_change_history`, `qobrix_top_field_changers`), **cache** helpers (`qobrix_cache_stats`, `qobrix_cache_clear`), and **session & identity** (`qobrix_whoami`):
 
 | Entity Group | Tools | Capabilities |
 |-------------|-------|-------------|
@@ -132,7 +132,7 @@ The server is organized around six RESO-aligned business processes. The LLM rece
 | **Customers** | 1 | Repeat-buyer / seller / lead cohorts (`qobrix_cohort`) — find contacts that appear on multiple closed deals or opportunities |
 | **Audit** | 4 | Per-record change log (`qobrix_get_changes`), cross-resource change search (`qobrix_search_changes`), field-level history (`qobrix_field_change_history`), top field changers (`qobrix_top_field_changers`) |
 | **Cache** | 2 | Stats and prefix or full invalidation for fresher reads |
-| **Session & identity** | 3 | Interactive sign-in (`qobrix_sign_in`), full revoke sign-out (`qobrix_sign_out`), current user profile (`qobrix_whoami`) — the signed-header path; sensible no-ops for `none` and `api_key` |
+| **Session & identity** | 1 | Current user profile (`qobrix_whoami`). Sign-in is User OAuth on the client. |
 
 Every tool description includes its canonical workflow role, RESO equivalent, verified `include[]` options, FK resolution guidance, and search expression examples.
 
@@ -296,7 +296,7 @@ How the signed-header path works (MCP self-auth — northbound clients unchanged
 2. The user opens **`/connect`** on this server (anti-phishing indirection) → signed cookie + redirect to the Enterprise OAuth login page
 3. After login + 2FA + consent, the AS redirects to **`/oauth/callback`**; this MCP exchanges the code (PKCE), introspects for Qobrix credentials, and stores them in an **encrypted session vault**
 4. The next tool call runs authenticated. On Qobrix `401`/`403`, the vault is cleared and a fresh `/connect` URL is returned
-5. Agents can also call **`qobrix_sign_in`**, **`qobrix_whoami`**, and **`qobrix_sign_out`** (full revoke via AS `/disconnect` + Qobrix API-key delete)
+5. Agents call **`qobrix_whoami`** to confirm the signed-in account. Sign-in is the client's OAuth flow, not a tool.
 
 - Not available as a public download and **not** something you can clone from GitHub.
 - Delivered and configured by our team **upon request** as an enterprise solution bundle.

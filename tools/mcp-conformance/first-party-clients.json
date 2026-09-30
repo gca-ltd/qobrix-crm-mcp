@@ -1,0 +1,10 @@
+[
+  {
+    "redirect_uri": "https://mihslqjjclbrqelnjjpb.supabase.co/functions/v1/mcp-oauth/callback",
+    "name": "Digital Employees"
+  },
+  {
+    "redirect_uri": "https://mihslqjjclbrqelnjjpb.supabase.co/functions/v1/tools-oauth",
+    "name": "Digital Employees"
+  }
+]

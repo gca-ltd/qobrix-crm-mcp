@@ -11,6 +11,9 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 
 ### Fixed
 
+- A cold call returns a standard 401. The server no longer offers `qobrix_sign_in` or `qobrix_sign_out`, and a tool result no longer contains a sign-in link.
+- An oversized result is an error the agent can narrow, and every error includes a next step.
+- Health reports `drift` and the protocol versions the profile expects.
 - The connected and error pages use the shared Matrix sign-in card (light canvas, Sharp SIR logo, navy button), the same card as the intranet sign-in page.
 - Connected and error pages follow the browser language (English, Russian, or Hungarian).
 
@@ -18,7 +21,7 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 
 - `QOBRIX_MCP_AUTH` is a comma list of `none`, `api_key`, and `oauth_user`. HTTP defaults to `api_key,oauth_user` and selects the type from the request. Older single values still work for one minor release and warn once at boot.
 - An API key may be sent as `Authorization: Bearer <user>:<key>`. A bearer token without a colon is User OAuth.
-- `/health` includes `signed_header_requests`. The signed-header path stays while `QOBRIX_MCP_XCHAT_LEGACY` is on (the default). Turn it off only after seven days at zero, counted from 2026-09-29.
+- The signed-header path is off unless `QOBRIX_MCP_XCHAT_LEGACY` is set. Health follows the profile body (`ok`, `version`, `protocolVersions`, `auth`, `drift`).
 - `qobrix_whoami` returns `email`, `user_id`, `display_name`, and `scope`.
 - Tool titles and read-only annotations on every tool. `serverInfo.version` comes from `package.json`.
 - Origin allowlist (`QOBRIX_MCP_ALLOWED_ORIGINS`, default `https://intranet.sharpsir.group`). A missing Origin is allowed. `GET` and `DELETE` on `/mcp` return 405.
