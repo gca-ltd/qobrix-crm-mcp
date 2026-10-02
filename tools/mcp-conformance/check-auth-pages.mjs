@@ -10,7 +10,7 @@ import { join, relative } from "node:path";
 const repo = process.argv[2] || process.cwd();
 const kb = process.env.MCP_KB_ROOT || "/home/bitnami/matrix-platform-kb";
 const canonicalDir = join(kb, "tools/mcp-conformance");
-const COPIES = ["auth-page.mjs", "sharp-sir-logo.svg", "first-party-clients.json"];
+const COPIES = ["auth-page.mjs", "sharp-sir-logo.svg", "first-party-clients.json", "redirect-allowlist.json"];
 
 const problems = [];
 

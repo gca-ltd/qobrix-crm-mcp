@@ -1,0 +1,46 @@
+[
+  {
+    "redirect_uri": "https://mihslqjjclbrqelnjjpb.supabase.co/functions/v1/mcp-oauth/callback",
+    "client": "Digital Employees"
+  },
+  {
+    "redirect_uri": "https://mihslqjjclbrqelnjjpb.supabase.co/functions/v1/tools-oauth",
+    "client": "Digital Employees (legacy)"
+  },
+  {
+    "redirect_uri": "https://claude.ai/api/mcp/auth_callback",
+    "client": "Claude"
+  },
+  {
+    "redirect_uri": "https://www.cursor.com/agents/mcp/oauth/callback",
+    "client": "Cursor"
+  },
+  {
+    "redirect_uri": "cursor://anysphere.cursor-mcp/oauth/callback",
+    "client": "Cursor desktop"
+  },
+  {
+    "redirect_uri": "https://dust.tt/oauth/mcp/finalize",
+    "client": "Dust"
+  },
+  {
+    "redirect_uri": "https://dust.tt/oauth/mcp_static/finalize",
+    "client": "Dust"
+  },
+  {
+    "redirect_uri": "https://eu.dust.tt/oauth/mcp/finalize",
+    "client": "Dust"
+  },
+  {
+    "redirect_uri": "https://eu.dust.tt/oauth/mcp_static/finalize",
+    "client": "Dust"
+  },
+  {
+    "redirect_uri": "https://app.dust.tt/oauth/mcp/finalize",
+    "client": "Dust"
+  },
+  {
+    "redirect_uri": "https://app.dust.tt/oauth/mcp_static/finalize",
+    "client": "Dust"
+  }
+]
