@@ -1,7 +1,6 @@
 import type {
   QobrixPaginatedResponse,
   QobrixSingleResponse,
-  QobrixErrorResponse,
   ListOpts,
   GetOpts,
   ChangesOpts,
@@ -24,6 +23,13 @@ import {
   beginConnect,
   clearSession,
 } from "./oauth-client.js";
+import { notifyCredentialsInvalidate } from "./companion-invalidate.js";
+import {
+  QobrixApiError,
+  classifyQobrixFailure,
+  probeQobrixApiKey,
+} from "./errors.js";
+import { evictIntrospectionCache } from "./oauth-rs.js";
 
 export { AuthRequiredError } from "./oauth-client.js";
 
@@ -195,12 +201,13 @@ export class QobrixClient {
     });
 
     if (!response.ok) {
+      const mode = effectiveAuthMode();
       // the signed-header path: expired / revoked Qobrix keys → clear vault and re-prompt connect.
       if (
         (response.status === 401 || response.status === 403) &&
-        effectiveAuthMode() === "oauth"
+        mode === "oauth"
       ) {
-        clearSession(); // scoped to current request vaultKey via ALS
+        clearSession();
         const { elicitationId, connectUrl } = beginConnect();
         throw new AuthRequiredError({
           elicitationId,
@@ -209,16 +216,37 @@ export class QobrixClient {
             "Qobrix session expired or was revoked. Open the connect URL to sign in again.",
         });
       }
-      let errorBody: string;
+
+      let body: unknown = null;
       try {
-        const errJson = (await response.json()) as QobrixErrorResponse;
-        errorBody = errJson.errors
-          ?.map((e) => e.message || JSON.stringify(e))
-          .join("; ") || `HTTP ${response.status}`;
+        body = await response.json();
       } catch {
-        errorBody = `HTTP ${response.status} ${response.statusText}`;
+        body = null;
       }
-      throw new Error(`Qobrix API error: ${errorBody}`);
+
+      let keyProbe: "valid" | "invalid" | "unknown" | undefined;
+      if (response.status === 401 && mode === "oauth_user") {
+        const ctx = getAuthContext();
+        if (ctx?.apiUrl && ctx.apiUser && ctx.apiKey) {
+          keyProbe = await probeQobrixApiKey({
+            apiUrl: ctx.apiUrl,
+            apiUser: ctx.apiUser,
+            apiKey: ctx.apiKey,
+          });
+          if (keyProbe === "invalid" && ctx.accessToken) {
+            await notifyCredentialsInvalidate(ctx.accessToken);
+            evictIntrospectionCache(ctx.accessToken);
+          }
+        }
+      }
+
+      const classification = classifyQobrixFailure({
+        httpStatus: response.status,
+        authMode: mode,
+        body,
+        keyProbe,
+      });
+      throw new QobrixApiError(classification);
     }
 
     return (await response.json()) as T;

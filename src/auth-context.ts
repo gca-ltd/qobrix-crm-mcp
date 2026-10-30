@@ -12,6 +12,8 @@ export type AuthCredentials = {
   locale?: string;
   /** OAuth subject (the signed-header path). */
   subject?: string;
+  /** MCP access token (oauth_user) for AS credential invalidation. */
+  accessToken?: string;
 };
 
 const authStorage = new AsyncLocalStorage<AuthCredentials>();

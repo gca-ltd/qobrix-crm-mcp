@@ -11,6 +11,7 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 
 ### Fixed
 
+- Dead stored Qobrix API keys are detected via `GET /api/v2/profile/api-key`, reset on the authorization server, and reported to agents as `qobrix_key_rejected` with a reconnect action (not a generic Unauthorized). Tool errors include `code`, `fix_owner`, `user_action`, and `not_the_cause`. `qobrix_whoami` exposes live `connection.status`.
 - A cold call returns a standard 401. The server no longer offers `qobrix_sign_in` or `qobrix_sign_out`, and a tool result no longer contains a sign-in link.
 - An oversized result is an error the agent can narrow, and every error includes a next step.
 - Health reports `drift` and the protocol versions the profile expects.

@@ -120,6 +120,13 @@ function tokenCacheKey(token: string): string {
  * Avoids an /introspect round-trip (and AS rate-limit pressure) on every
  * /mcp call. Failures and inactive tokens are never cached.
  */
+let introspectionCacheEvict: ((token: string) => void) | undefined;
+
+/** Drop a cached introspection entry after credential invalidation. */
+export function evictIntrospectionCache(token: string): void {
+  introspectionCacheEvict?.(token);
+}
+
 export function createCompanionTokenVerifier(opts: {
   issuer: URL;
   resourceServerUrl: URL;
@@ -129,6 +136,10 @@ export function createCompanionTokenVerifier(opts: {
   const { issuer, resourceServerUrl, introspectionEndpoint, introspectionSecret } =
     opts;
   const cache = new Map<string, CachedAuthInfo>();
+
+  introspectionCacheEvict = (token: string) => {
+    cache.delete(tokenCacheKey(token));
+  };
 
   function cacheGet(key: string): AuthInfo | undefined {
     const hit = cache.get(key);
@@ -221,6 +232,7 @@ export function createCompanionTokenVerifier(opts: {
         apiUrl: data.qobrix_api_url,
         locale: data.qobrix_locale,
         subject: data.sub,
+        accessToken: token,
       };
 
       const auth: AuthInfo = {

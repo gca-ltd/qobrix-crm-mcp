@@ -25,7 +25,10 @@ limit defaults to 10 and caps at 100. expand and media default to false.
 A soft cap sets _truncated. A hard cap sets result_too_large and isError.
 
 ## Identity
-Call qobrix_whoami. It returns email, user_id, display_name, and scope.
+Call qobrix_whoami. It returns email, user_id, display_name, scope, and connection.status (live key check).
+
+## Errors
+When a tool returns structured error.code, report error.user_action and error.fix_owner to the user exactly as given. Do not infer other causes (for example there is no shared service token).
 
 ## Known quirks
 Some nullable sorts return no rows. Use qobrix_top_records for those.

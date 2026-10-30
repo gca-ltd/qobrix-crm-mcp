@@ -20,7 +20,8 @@
     "test:relevance": "node --test test-suite/relevance.test.mjs",
     "test:auth-types": "node tools/mcp-conformance/check-mcp-terminology.mjs && node --test --test-concurrency=1 test-suite/auth-types.unit.test.mjs",
     "test:vault-identity": "node --test test-suite/vault-identity.test.mjs",
-    "test:all": "node -r ./test-suite/load-env.cjs --test test-suite/integration.test.mjs test-suite/scenarios.test.mjs test-suite/workflows.test.mjs test-suite/cache.test.mjs test-suite/format.test.mjs test-suite/client-sort.test.mjs test-suite/relevance.test.mjs test-suite/auth-types.test.mjs test-suite/auth-types.unit.test.mjs test-suite/vault-identity.test.mjs"
+    "test:errors": "node --test test-suite/errors.test.mjs",
+    "test:all": "node -r ./test-suite/load-env.cjs --test test-suite/integration.test.mjs test-suite/scenarios.test.mjs test-suite/workflows.test.mjs test-suite/cache.test.mjs test-suite/format.test.mjs test-suite/client-sort.test.mjs test-suite/relevance.test.mjs test-suite/auth-types.test.mjs test-suite/auth-types.unit.test.mjs test-suite/vault-identity.test.mjs test-suite/errors.test.mjs"
   },
   "keywords": [
     "mcp",

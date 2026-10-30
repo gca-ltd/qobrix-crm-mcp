@@ -22,6 +22,7 @@ import { registerCacheTools } from "./cache.js";
 import { registerAuditTools } from "./audit.js";
 import { registerSessionTools } from "./session.js";
 import { AuthRequiredError, registerElicitationNotifier } from "../oauth-client.js";
+import { QobrixApiError } from "../errors.js";
 import {
   clientSupportsUrlElicitation,
   getRequestMcpServer,
@@ -353,6 +354,29 @@ export function errorResult(error: unknown) {
     return {
       content: [{ type: "text" as const, text: "Sign-in is required." }],
       structuredContent: { error: "Sign-in is required.", next_step: "Sign in again from the client. This server does not return a link." },
+      isError: true as const,
+    };
+  }
+
+  if (error instanceof QobrixApiError) {
+    const c = error.classification;
+    const detail = c.qobrix_message ? ` Qobrix: ${c.qobrix_message}` : "";
+    const notCause = c.not_the_cause ? ` Not the cause: ${c.not_the_cause}` : "";
+    const text = `${error.message}${detail}${notCause}`;
+    return {
+      content: [{ type: "text" as const, text }],
+      structuredContent: {
+        error: {
+          code: c.code,
+          http_status: c.http_status,
+          retryable: c.retryable,
+          fix_owner: c.fix_owner,
+          user_action: c.user_action,
+          not_the_cause: c.not_the_cause,
+          qobrix_message: c.qobrix_message,
+        },
+        next_step: c.user_action,
+      },
       isError: true as const,
     };
   }
