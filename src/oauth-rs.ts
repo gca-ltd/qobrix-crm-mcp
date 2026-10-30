@@ -34,6 +34,7 @@ export type IntrospectionResult = {
   qobrix_api_key?: string;
   qobrix_api_url?: string;
   qobrix_locale?: string;
+  error?: string;
 };
 
 export function requireOAuthEnv(): {
@@ -194,6 +195,11 @@ export function createCompanionTokenVerifier(opts: {
 
       const data = (await response.json()) as IntrospectionResult;
       if (!data.active) {
+        if (data.error === "credentials_revoked") {
+          throw new Error(
+            "The saved Qobrix key was reset; sign in to Qobrix CRM again"
+          );
+        }
         throw new Error("Token is not active");
       }
 

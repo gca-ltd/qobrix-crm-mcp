@@ -2,6 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
   classifyQobrixFailure,
+  classifyQobrixNetworkFailure,
   qobrixErrorMessages,
   formatErrorHeadline,
   QobrixApiError,
@@ -19,11 +20,29 @@ describe("Qobrix error classification", () => {
       authMode: "oauth_user",
       body: { errors: ["Unauthorized"] },
       keyProbe: "invalid",
+      credentialsInvalidated: true,
     });
     assert.equal(c.code, "qobrix_key_rejected");
-    assert.equal(c.fix_owner, "user");
-    assert.match(c.user_action, /Reconnect Qobrix CRM/);
-    assert.match(c.not_the_cause, /no shared token/);
+    assert.match(c.user_action, /was reset/);
+    const noReset = classifyQobrixFailure({
+      httpStatus: 401,
+      authMode: "oauth_user",
+      body: { errors: ["Unauthorized"] },
+      keyProbe: "invalid",
+      credentialsInvalidated: false,
+    });
+    assert.doesNotMatch(noReset.user_action, /was reset/);
+  });
+
+  it("maps oauth_user 401 + unknown probe to qobrix_auth_unverified", () => {
+    const c = classifyQobrixFailure({
+      httpStatus: 401,
+      authMode: "oauth_user",
+      body: { errors: ["Unauthorized"] },
+      keyProbe: "unknown",
+    });
+    assert.equal(c.code, "qobrix_auth_unverified");
+    assert.equal(c.retryable, true);
   });
 
   it("maps oauth_user 401 + valid probe to qobrix_auth_unconfirmed", () => {
@@ -78,6 +97,45 @@ describe("Qobrix error classification", () => {
     assert.match(c.qobrix_message, /nosuchfield/);
   });
 
+  it("maps 403 429 500 503", () => {
+    assert.equal(
+      classifyQobrixFailure({
+        httpStatus: 403,
+        authMode: "oauth_user",
+        body: { errors: ["Forbidden"] },
+      }).code,
+      "qobrix_forbidden"
+    );
+    assert.equal(
+      classifyQobrixFailure({
+        httpStatus: 429,
+        authMode: "oauth_user",
+        body: { errors: ["Too many"] },
+      }).code,
+      "qobrix_rate_limited"
+    );
+    assert.equal(
+      classifyQobrixFailure({
+        httpStatus: 500,
+        authMode: "oauth_user",
+        body: { errors: ["Unsuccessful operation"] },
+      }).code,
+      "qobrix_server_error"
+    );
+    assert.equal(
+      classifyQobrixFailure({
+        httpStatus: 503,
+        authMode: "oauth_user",
+        body: { errors: ["Unavailable"] },
+      }).code,
+      "qobrix_unavailable"
+    );
+  });
+
+  it("classifyQobrixNetworkFailure", () => {
+    assert.equal(classifyQobrixNetworkFailure("timeout").code, "qobrix_unavailable");
+  });
+
   it("QobrixApiError headline includes code", () => {
     const c = classifyQobrixFailure({
       httpStatus: 401,
@@ -88,5 +146,50 @@ describe("Qobrix error classification", () => {
     const err = new QobrixApiError(c);
     assert.match(err.message, /\[qobrix_key_rejected\]/);
     assert.equal(formatErrorHeadline(c), err.message);
+  });
+
+  it("errorResult snapshots for key codes", async () => {
+    const { errorResult } = await import("../dist/tools/index.js");
+    const rejected = errorResult(
+      new QobrixApiError(
+        classifyQobrixFailure({
+          httpStatus: 401,
+          authMode: "oauth_user",
+          body: { errors: ["Unauthorized"] },
+          keyProbe: "invalid",
+          credentialsInvalidated: true,
+        })
+      ),
+      "qobrix_list_opportunities"
+    );
+    assert.equal(rejected.isError, true);
+    assert.equal(rejected.structuredContent.error.code, "qobrix_key_rejected");
+    assert.match(rejected.structuredContent.error.user_action, /reset/i);
+
+    const args = errorResult(
+      new QobrixApiError(
+        classifyQobrixFailure({
+          httpStatus: 400,
+          authMode: "oauth_user",
+          body: { errors: ["bad field"] },
+        })
+      ),
+      "qobrix_search_opportunities"
+    );
+    assert.equal(args.structuredContent.error.code, "invalid_arguments");
+
+    const route = errorResult(
+      new QobrixApiError(
+        classifyQobrixFailure({
+          httpStatus: 404,
+          authMode: "oauth_user",
+          body: {
+            errors: ["A route matching `/api/v2/nosuch` could not be found."],
+          },
+        })
+      ),
+      "qobrix_meta"
+    );
+    assert.equal(route.structuredContent.error.code, "bridge_route_missing");
   });
 });

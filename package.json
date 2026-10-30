@@ -11,7 +11,7 @@
     "build": "tsc && mkdir -p dist/assets && cp src/assets/sharp-sir-logo.svg dist/assets/",
     "dev": "tsc --watch",
     "start": "node dist/index.js",
-    "test": "node tools/mcp-conformance/check-mcp-terminology.mjs && node -r ./test-suite/load-env.cjs --test test-suite/integration.test.mjs",
+    "test": "node tools/mcp-conformance/check-mcp-terminology.mjs && node --test test-suite/errors.test.mjs && node -r ./test-suite/load-env.cjs --test test-suite/integration.test.mjs",
     "test:scenarios": "node -r ./test-suite/load-env.cjs --test test-suite/scenarios.test.mjs",
     "test:workflows": "node -r ./test-suite/load-env.cjs --test test-suite/workflows.test.mjs",
     "test:cache": "node --test test-suite/cache.test.mjs",

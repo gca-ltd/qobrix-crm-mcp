@@ -27,6 +27,7 @@ import { notifyCredentialsInvalidate } from "./companion-invalidate.js";
 import {
   QobrixApiError,
   classifyQobrixFailure,
+  classifyQobrixNetworkFailure,
   probeQobrixApiKey,
 } from "./errors.js";
 import { evictIntrospectionCache } from "./oauth-rs.js";
@@ -195,10 +196,16 @@ export class QobrixClient {
   ): Promise<T> {
     const url = this.buildUrl(path, params);
 
-    const response = await fetch(url, {
-      method: "GET",
-      headers: this.headers,
-    });
+    let response: Response;
+    try {
+      response = await fetch(url, {
+        method: "GET",
+        headers: this.headers,
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      throw new QobrixApiError(classifyQobrixNetworkFailure(msg));
+    }
 
     if (!response.ok) {
       const mode = effectiveAuthMode();
@@ -225,16 +232,18 @@ export class QobrixClient {
       }
 
       let keyProbe: "valid" | "invalid" | "unknown" | undefined;
+      let credentialsInvalidated = false;
       if (response.status === 401 && mode === "oauth_user") {
         const ctx = getAuthContext();
-        if (ctx?.apiUrl && ctx.apiUser && ctx.apiKey) {
-          keyProbe = await probeQobrixApiKey({
-            apiUrl: ctx.apiUrl,
-            apiUser: ctx.apiUser,
-            apiKey: ctx.apiKey,
-          });
-          if (keyProbe === "invalid" && ctx.accessToken) {
-            await notifyCredentialsInvalidate(ctx.accessToken);
+        keyProbe = await probeQobrixApiKey({
+          apiUrl: this.baseUrl,
+          apiUser: this.headers["X-Api-User"],
+          apiKey: this.headers["X-Api-Key"],
+        });
+        if (keyProbe === "invalid" && ctx?.accessToken) {
+          const inv = await notifyCredentialsInvalidate(ctx.accessToken);
+          credentialsInvalidated = inv.invalidated;
+          if (credentialsInvalidated) {
             evictIntrospectionCache(ctx.accessToken);
           }
         }
@@ -245,6 +254,7 @@ export class QobrixClient {
         authMode: mode,
         body,
         keyProbe,
+        credentialsInvalidated,
       });
       throw new QobrixApiError(classification);
     }

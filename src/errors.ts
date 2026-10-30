@@ -9,6 +9,7 @@ export type FixOwner = "user" | "qobrix_admin" | "bridge_operator" | "agent";
 
 export type QobrixErrorCode =
   | "qobrix_key_rejected"
+  | "qobrix_auth_unverified"
   | "qobrix_auth_unconfirmed"
   | "qobrix_key_invalid"
   | "qobrix_forbidden"
@@ -61,18 +62,33 @@ export function formatErrorHeadline(c: ClassifiedQobrixError): string {
   return `${c.user_action} [${c.code}]`;
 }
 
+/** Network / DNS / timeout — no HTTP response from Qobrix. */
+export function classifyQobrixNetworkFailure(message?: string): ClassifiedQobrixError {
+  return {
+    code: "qobrix_unavailable",
+    http_status: 0,
+    retryable: true,
+    fix_owner: "user",
+    user_action: "Qobrix is temporarily unreachable. Retry later.",
+    not_the_cause: "Your sign-in or API key.",
+    qobrix_message: message || "Network error",
+  };
+}
+
 export function classifyQobrixFailure(opts: {
   httpStatus: number;
   authMode: AuthMode;
   body: unknown;
   /** When set, refines 401 for oauth_user. */
   keyProbe?: "valid" | "invalid" | "unknown";
+  /** AS confirmed vault row was removed. */
+  credentialsInvalidated?: boolean;
 }): ClassifiedQobrixError {
   const msgs = qobrixErrorMessages(opts.body);
   const qobrix_message =
     msgs.join("; ") || `HTTP ${opts.httpStatus}`;
 
-  const { httpStatus: status, authMode, keyProbe } = opts;
+  const { httpStatus: status, authMode, keyProbe, credentialsInvalidated } = opts;
 
   if (status === 401) {
     if (authMode === "oauth_user") {
@@ -89,15 +105,29 @@ export function classifyQobrixFailure(opts: {
           qobrix_message,
         };
       }
+      if (keyProbe === "invalid") {
+        return {
+          code: "qobrix_key_rejected",
+          http_status: status,
+          retryable: false,
+          fix_owner: "user",
+          user_action: credentialsInvalidated
+            ? "Qobrix rejected the saved API key for this connection, so it was reset. Reconnect Qobrix CRM in your connector settings and sign in again with your Qobrix credentials."
+            : "Qobrix rejected the saved API key for this connection. Reconnect Qobrix CRM in your connector settings and sign in again with your Qobrix credentials.",
+          not_the_cause:
+            "The MCP connector itself, the MCP server being down, or a shared service token — there is no shared token; each user has their own Qobrix API key.",
+          qobrix_message,
+        };
+      }
       return {
-        code: "qobrix_key_rejected",
+        code: "qobrix_auth_unverified",
         http_status: status,
-        retryable: false,
+        retryable: true,
         fix_owner: "user",
         user_action:
-          "Qobrix rejected the saved API key for this connection, so it was reset. Reconnect Qobrix CRM in your connector settings and sign in again with your Qobrix credentials.",
+          "Qobrix refused the request and the saved API key could not be verified (Qobrix may be unreachable). Retry shortly; if it repeats, reconnect Qobrix CRM in your connector settings and sign in again.",
         not_the_cause:
-          "The MCP connector itself, the MCP server being down, or a shared service token — there is no shared token; each user has their own Qobrix API key.",
+          "A confirmed dead API key — verification did not complete.",
         qobrix_message,
       };
     }

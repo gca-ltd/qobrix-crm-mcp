@@ -11,6 +11,7 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 
 ### Fixed
 
+- OAuth 401 classification distinguishes a definitely dead key (`qobrix_key_rejected`, reset wording only when the AS confirmed invalidation), an unverified key (`qobrix_auth_unverified` when the probe could not run), and network failures (`qobrix_unavailable`). Other bridge faults map to `bridge_error`. Introspection `credentials_revoked` tells the client the saved key was reset. Each failed tool call logs one stderr line (tool, code, status, hashed subject, truncated Qobrix message) without secrets. `qobrix_whoami` honours env `QOBRIX_API_KEY`, reports `not_connected` when nothing is configured, and uses per-mode reconnect guidance.
 - Dead stored Qobrix API keys are detected via `GET /api/v2/profile/api-key`, reset on the authorization server, and reported to agents as `qobrix_key_rejected` with a reconnect action (not a generic Unauthorized). Tool errors include `code`, `fix_owner`, `user_action`, and `not_the_cause`. `qobrix_whoami` exposes live `connection.status`.
 - A cold call returns a standard 401. The server no longer offers `qobrix_sign_in` or `qobrix_sign_out`, and a tool result no longer contains a sign-in link.
 - An oversized result is an error the agent can narrow, and every error includes a next step.

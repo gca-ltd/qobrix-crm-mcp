@@ -13,11 +13,17 @@ import { WhoAmISchema } from "../schemas.js";
 import { errorResult, formatResult } from "./index.js";
 import { notifyCredentialsInvalidate } from "../companion-invalidate.js";
 import { evictIntrospectionCache } from "../oauth-rs.js";
-import { probeQobrixApiKey } from "../errors.js";
+import { classifyQobrixFailure, probeQobrixApiKey } from "../errors.js";
 
 function effectiveAuthMode(): AuthMode {
   return getRequestAuthMode() ?? resolveAuthMode();
 }
+
+type ConnectionStatus =
+  | "ok"
+  | "not_connected"
+  | "qobrix_key_rejected"
+  | "qobrix_unavailable";
 
 export function registerSessionTools(server: McpServer): void {
   server.tool(
@@ -34,11 +40,11 @@ export function registerSessionTools(server: McpServer): void {
           creds?.apiUrl || ctx?.apiUrl || process.env.QOBRIX_API_URL || "";
         const apiUser =
           creds?.apiUser || ctx?.apiUser || process.env.QOBRIX_API_USER || "";
-        const apiKey = creds?.apiKey || ctx?.apiKey || "";
+        const apiKey =
+          creds?.apiKey || ctx?.apiKey || process.env.QOBRIX_API_KEY || "";
         const checkedAt = new Date().toISOString();
 
-        let connectionStatus: "ok" | "qobrix_key_rejected" | "qobrix_unavailable" =
-          "qobrix_unavailable";
+        let connectionStatus: ConnectionStatus = "not_connected";
         let connectionHttpStatus: number | null = null;
 
         if (apiUrl && apiUser && apiKey) {
@@ -66,7 +72,7 @@ export function registerSessionTools(server: McpServer): void {
           if (sessionProbe.ok && sessionProbe.data !== undefined) {
             profile = sessionProbe.data;
             profileSource = "live";
-          } else if (userIdFromContext(apiUser)) {
+          } else if (apiUser) {
             const userProbe = await client.tryGetPath(`users/${apiUser}`);
             if (userProbe.ok && userProbe.data !== undefined) {
               profile = userProbe.data;
@@ -108,27 +114,35 @@ export function registerSessionTools(server: McpServer): void {
           payload.oauth_subject = creds?.subject || ctx?.subject;
         }
         if (apiUser) payload.api_user = apiUser;
+
+        if (connectionStatus === "qobrix_key_rejected") {
+          const c = classifyQobrixFailure({
+            httpStatus: 401,
+            authMode: mode,
+            body: { errors: ["Unauthorized"] },
+            keyProbe: "invalid",
+            credentialsInvalidated: mode === "oauth_user",
+          });
+          payload.user_action = c.user_action;
+          payload.not_the_cause = c.not_the_cause;
+        } else if (connectionStatus === "not_connected") {
+          payload.user_action =
+            mode === "oauth_user"
+              ? "Connect Qobrix CRM in your client and complete sign-in."
+              : "Provide Qobrix API credentials for this session.";
+        }
+
         if (profile !== undefined) {
           payload.profile = profile;
           payload.profile_source = profileSource;
-        }
-        if (connectionStatus === "qobrix_key_rejected") {
-          payload.user_action =
-            "Reconnect Qobrix CRM in your connector settings and sign in again with your Qobrix credentials.";
-          payload.not_the_cause =
-            "The MCP connector itself or a shared service token — there is no shared token.";
         } else if (connectionStatus === "qobrix_unavailable" && !profile) {
           payload.profile_unavailable =
             "Could not verify the live connection. Identity above may be from a prior session.";
         }
         return formatResult(payload);
       } catch (error) {
-        return errorResult(error);
+        return errorResult(error, "qobrix_whoami");
       }
     }
   );
-}
-
-function userIdFromContext(apiUser: string): boolean {
-  return Boolean(apiUser.trim());
 }

@@ -36,7 +36,7 @@ export function registerOpportunityTools(server: McpServer): void {
         });
         return formatResult(result);
       } catch (error) {
-        return errorResult(error);
+        return errorResult(error, "qobrix_list_opportunities");
       }
     }
   );
@@ -60,7 +60,7 @@ export function registerOpportunityTools(server: McpServer): void {
         const result = await getClient().get("opportunities", id, { include });
         return formatResult(result);
       } catch (error) {
-        return errorResult(error);
+        return errorResult(error, "qobrix_get_opportunity");
       }
     }
   );
@@ -86,7 +86,7 @@ export function registerOpportunityTools(server: McpServer): void {
         });
         return formatResult(result);
       } catch (error) {
-        return errorResult(error);
+        return errorResult(error, "qobrix_search_opportunities");
       }
     }
   );
@@ -109,7 +109,7 @@ export function registerOpportunityTools(server: McpServer): void {
         );
         return formatResult(result);
       } catch (error) {
-        return errorResult(error);
+        return errorResult(error, "qobrix_get_leads_by_property");
       }
     }
   );
@@ -130,7 +130,7 @@ export function registerOpportunityTools(server: McpServer): void {
         const result = await getClient().getSubresource("opportunities", id, "properties");
         return formatResult(result);
       } catch (error) {
-        return errorResult(error);
+        return errorResult(error, "qobrix_get_lead_properties");
       }
     }
   );

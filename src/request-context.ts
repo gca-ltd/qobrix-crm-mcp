@@ -15,6 +15,8 @@ export type RequestContext = {
   vaultKey?: string;
   /** HTTP auth mode for this MCP request (dual-mode per-path routing). */
   authMode?: AuthMode;
+  /** Last MCP tool name (when set by the handler). */
+  toolName?: string;
 };
 
 const requestStorage = new AsyncLocalStorage<RequestContext>();

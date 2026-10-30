@@ -7,9 +7,9 @@ import { requireOAuthEnv } from "./oauth-rs.js";
 export async function notifyCredentialsInvalidate(
   accessToken: string
 ): Promise<{ invalidated: boolean }> {
-  const { issuer, introspectionSecret } = requireOAuthEnv();
-  const url = new URL("credentials/invalidate", issuer);
   try {
+    const { issuer, introspectionSecret } = requireOAuthEnv();
+    const url = new URL("credentials/invalidate", issuer);
     const res = await fetch(url.href, {
       method: "POST",
       headers: {

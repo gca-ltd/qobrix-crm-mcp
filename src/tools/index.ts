@@ -22,11 +22,48 @@ import { registerCacheTools } from "./cache.js";
 import { registerAuditTools } from "./audit.js";
 import { registerSessionTools } from "./session.js";
 import { AuthRequiredError, registerElicitationNotifier } from "../oauth-client.js";
-import { QobrixApiError } from "../errors.js";
+import { createHash } from "node:crypto";
+import { ZodError } from "zod";
+import {
+  QobrixApiError,
+  classifyQobrixFailure,
+} from "../errors.js";
+import { getAuthContext } from "../auth-context.js";
 import {
   clientSupportsUrlElicitation,
+  getRequestAuthMode,
+  getRequestContext,
   getRequestMcpServer,
 } from "../request-context.js";
+import type { AuthMode } from "../auth-types.js";
+import { resolveAuthMode } from "../auth-types.js";
+
+function logToolFailure(toolName: string, error: unknown): void {
+  const ctx = getAuthContext();
+  const subHash = ctx?.subject
+    ? createHash("sha256").update(ctx.subject).digest("hex").slice(0, 12)
+    : "none";
+  const tool =
+    toolName !== "unknown"
+      ? toolName
+      : getRequestContext()?.toolName ?? "unknown";
+
+  if (error instanceof QobrixApiError) {
+    const c = error.classification;
+    const msg = c.qobrix_message.replace(/\s+/g, " ").slice(0, 200);
+    process.stderr.write(
+      `[qobrix-crm-mcp] tool_error tool=${tool} code=${c.code} http=${c.http_status} sub=${subHash} msg=${msg}\n`
+    );
+    return;
+  }
+  const brief =
+    error instanceof Error
+      ? error.message.replace(/\s+/g, " ").slice(0, 200)
+      : String(error).slice(0, 200);
+  process.stderr.write(
+    `[qobrix-crm-mcp] tool_error tool=${tool} code=bridge_error http=0 sub=${subHash} msg=${brief}\n`
+  );
+}
 
 // Hard cap on tool result size, in characters of the rendered JSON text.
 // Default 30 000 chars ≈ 7.5 K tokens, which keeps a multi-tool turn well under
@@ -344,10 +381,28 @@ export function formatResult(data: unknown) {
   };
 }
 
-export function errorResult(error: unknown) {
+export function errorResult(error: unknown, toolName = "unknown") {
   // Let the SDK convert this to JSON-RPC -32042 for elicitation-capable clients.
   if (error instanceof UrlElicitationRequiredError) {
     throw error;
+  }
+
+  if (error instanceof ZodError) {
+    const authMode: AuthMode =
+      getRequestAuthMode() ?? resolveAuthMode();
+    const qobrix_message = error.issues
+      .map((i) => `${i.path.join(".")}: ${i.message}`)
+      .join("; ");
+    return errorResult(
+      new QobrixApiError(
+        classifyQobrixFailure({
+          httpStatus: 400,
+          authMode,
+          body: { errors: [qobrix_message] },
+        })
+      ),
+      toolName
+    );
   }
 
   if (error instanceof AuthRequiredError) {
@@ -359,6 +414,7 @@ export function errorResult(error: unknown) {
   }
 
   if (error instanceof QobrixApiError) {
+    logToolFailure(toolName, error);
     const c = error.classification;
     const detail = c.qobrix_message ? ` Qobrix: ${c.qobrix_message}` : "";
     const notCause = c.not_the_cause ? ` Not the cause: ${c.not_the_cause}` : "";
@@ -381,10 +437,29 @@ export function errorResult(error: unknown) {
     };
   }
 
+  logToolFailure(toolName, error);
   const message = error instanceof Error ? error.message : "An unknown error occurred";
+  const bridge = new QobrixApiError({
+    code: "bridge_error",
+    http_status: 0,
+    retryable: false,
+    fix_owner: "bridge_operator",
+    user_action: "An unexpected error occurred in the MCP server. Report this to the bridge operator.",
+    qobrix_message: message,
+  });
   return {
-    content: [{ type: "text" as const, text: `Error: ${message}` }],
-    structuredContent: { error: message, next_step: "Read the error, change the arguments, and call the tool again." },
+    content: [{ type: "text" as const, text: `${bridge.message} Qobrix: ${message}` }],
+    structuredContent: {
+      error: {
+        code: bridge.classification.code,
+        http_status: 0,
+        retryable: false,
+        fix_owner: "bridge_operator",
+        user_action: bridge.classification.user_action,
+        qobrix_message: message,
+      },
+      next_step: bridge.classification.user_action,
+    },
     isError: true as const,
   };
 }
